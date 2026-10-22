@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import ShelfCanvas from './ShelfCanvas';
 import BrandMark from './BrandMark';
+import BrandWordmark from './BrandWordmark';
 import { emptyState, newBook, uid, type AppState, type Book, type Publication, type PublicBook, type Shelf, type ShelfItem, type StateResponse } from '../lib/types';
 import styles from './PublicShelf.module.css';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
+import { copyShelfItems } from '@/lib/shelf-actions';
 
 class SignInRequired extends Error {}
 const sameBook=(book:Book,other:PublicBook)=>book.title.trim().toLocaleLowerCase()===other.title.trim().toLocaleLowerCase()&&book.author.trim().toLocaleLowerCase()===other.author.trim().toLocaleLowerCase();
@@ -92,12 +94,12 @@ export default function PublicShelf({id}:{id:string}) {
         }
         const shelf:Shelf={
           ...publication.shelf,id:uid('sh_'),title:publication.shelf.title.slice(0,130)+' — my version',publicId:undefined,updatedAt:new Date().toISOString(),
-          items:publication.shelf.items.flatMap<ShelfItem>(item=>{
-            if(item.kind==='book')return bookIds.has(item.bookId!)?[{...item,id:uid('it_'),bookId:bookIds.get(item.bookId!),pinned:false}]:[];
+          items:copyShelfItems(publication.shelf.items.flatMap<ShelfItem>(item=>{
+            if(item.kind==='book')return bookIds.has(item.bookId!)?[{...item,bookId:bookIds.get(item.bookId!),pinned:false}]:[];
             // Personal uploaded artwork stays with its owner. Built-in objects are reusable.
             if(item.decor==='image')return [];
-            return [{...item,id:uid('it_'),assetId:undefined,imageUrl:undefined,pinned:false}];
-          }),
+            return [{...item,assetId:undefined,imageUrl:undefined,pinned:false}];
+          }),()=>uid('it_')),
         };
         return {state:{...state,books,shelves:[...state.shelves,shelf]},message:'Your version is ready. Make it your own in Shelves.'};
       }));
@@ -108,7 +110,7 @@ export default function PublicShelf({id}:{id:string}) {
 
   return <div className={styles.page}>
     <header className={styles.header}>
-      <a href="/" className={styles.logo} aria-label="Cybershelf home"><BrandMark/> cybershelf<span className={styles.beta}>BETA</span></a>
+      <a href="/" className={styles.logo} aria-label="Cybershelf home"><BrandWordmark/><span className={styles.beta}>BETA</span></a>
       <a className={styles.headerLink} href="/">A shelf of your own <span aria-hidden="true">↗</span></a>
     </header>
     <main className={styles.main}>
@@ -138,7 +140,7 @@ export default function PublicShelf({id}:{id:string}) {
         </section>:null}
       </>:null}
     </main>
-    <footer className={styles.footer}><a href="/" className={styles.footerLogo}><BrandMark/>cybershelf</a><p>Your books. Your little corner of the internet.</p><span>MADE FOR KEEPING</span></footer>
+    <footer className={styles.footer}><a href="/" className={styles.footerLogo}><BrandWordmark/></a><p>Your books. Your little corner of the internet.</p><span>MADE FOR KEEPING</span></footer>
     <dialog ref={dialog} className={styles.dialog} onCancel={()=>setSelected(null)} onClick={event=>{if(event.target===event.currentTarget)setSelected(null);}} aria-labelledby="public-book-title">
       {selected?<div className={styles.dialogBody}>
         <button type="button" autoFocus className={styles.close} aria-label="Close book details" onClick={()=>setSelected(null)}>×</button>

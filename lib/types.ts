@@ -23,11 +23,15 @@ export type Bookcase = 'open' | 'cubby' | 'tower';
 export type ShelfLayout = 'balanced' | 'gallery' | 'stacks';
 export type ShelfFinish = 'paper' | 'oak' | 'moss' | 'ink';
 export type DecorKind = 'plant' | 'bear' | 'robot' | 'vase' | 'bookend' | 'image';
+/** Continuous position. x is the centre of the object across the whole row.
+ * The support reference is another item on this row; absent means the plank. */
+export interface ShelfPlacement { row: number; x: number; supportId?: string; }
 export interface ShelfItem {
   id: string; kind: 'book' | 'decor'; bookId?: string; decor?: DecorKind;
   assetId?: string; imageUrl?: string; label?: string;
   slot: number | null; pinned: boolean; facing: 'auto' | 'spine' | 'cover' | 'stack';
   lean?: 'auto' | 'upright' | 'left' | 'right';
+  placement?: ShelfPlacement;
 }
 export interface Shelf {
   id: string; title: string; description: string;
@@ -80,7 +84,46 @@ export function newBook(title:string,author='Unknown author'): Book { return {id
 export function assetUrl(id:string) { return '/api/assets/'+encodeURIComponent(id); }
 export function safeExternalUrl(value:string) { try {const url=new URL(value); return ['https:','http:'].includes(url.protocol)?url.href:null;} catch{return null;} }
 export function firstEmptySlot(shelf:Shelf) { const used=new Set(shelf.items.map(i=>i.slot)); for(let n=0;n<shelfCapacity(shelf);n++)if(!used.has(n))return n; return null; }
+/** Validate the support graph without recursion, including imported shelves.
+ * Slots identify visible legacy items; they no longer determine capacity once
+ * an item has a continuous placement. */
+export function shelfPlacementError(shelf: Pick<Shelf, 'bookcase' | 'layout' | 'items'>): string | null {
+  const grid = shelfGrid(shelf), byId = new Map(shelf.items.map(item => [item.id, item]));
+  for (const item of shelf.items) {
+    const position = item.placement;
+    if (!position) continue;
+    if (item.slot === null) return 'An item in the tray cannot have a shelf placement.';
+    if (!Number.isInteger(position.row) || position.row < 0 || position.row >= grid.rows) return 'A shelf placement has an invalid row.';
+    if (!Number.isFinite(position.x) || position.x < 0 || position.x > 1) return 'A shelf placement must stay within the shelf.';
+    if (position.supportId) {
+      const support = byId.get(position.supportId);
+      if (!support || support.slot === null) return 'A shelf placement refers to a missing support.';
+      if (support.id === item.id) return 'A shelf item cannot support itself.';
+      const supportRow = support.placement?.row ?? Math.floor(support.slot / grid.columns);
+      if (supportRow !== position.row) return 'A shelf item and its support must be on the same row.';
+    }
+  }
+  const finished = new Set<string>();
+  for (const item of shelf.items) {
+    const path = new Set<string>();
+    let cursor: string | undefined = item.id;
+    while (cursor && !finished.has(cursor)) {
+      if (path.has(cursor)) return 'Shelf supports cannot form a circle.';
+      path.add(cursor);
+      cursor = byId.get(cursor)?.placement?.supportId;
+    }
+    for (const id of path) finished.add(id);
+  }
+  return null;
+}
 export function resizeShelf(shelf:Shelf,change:Partial<Pick<Shelf,'bookcase'|'layout'|'finish'>>):Shelf {
-  const next={...shelf,...change}; const cap=shelfCapacity(next);
-  return {...next,items:next.items.map(item=>item.slot!==null&&item.slot>=cap?{...item,slot:null}:item)};
+  const next={...shelf,...change}, previousGrid=shelfGrid(shelf), nextGrid=shelfGrid(next);
+  const structureChanged=next.bookcase!==shelf.bookcase||next.layout!==shelf.layout;
+  return {...next,items:next.items.map(item=>{
+    if(item.slot===null){const {placement:_placement,...staged}=item;return staged;}
+    const position=item.placement??(structureChanged?{
+      row:Math.floor(item.slot/previousGrid.columns),x:(item.slot%previousGrid.columns+.5)/previousGrid.columns,
+    }:undefined);
+    return position?{...item,placement:{...position,row:Math.max(0,Math.min(nextGrid.rows-1,position.row)),x:Math.max(0,Math.min(1,position.x))}}:{...item};
+  })};
 }

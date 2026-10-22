@@ -6,7 +6,7 @@ import type { Book, ReadingComment, ReadingPost, StateResponse } from '@/lib/typ
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { progressLabel, readerPosition, readingDate } from '@/lib/reading';
 import BookCover from './BookCover';
-import BrandMark from './BrandMark';
+import BrandWordmark from './BrandWordmark';
 import SpoilerText from './SpoilerText';
 import styles from './ReadingConversation.module.css';
 
@@ -139,7 +139,7 @@ export default function ReadingThread({ id }: { id: string }) {
   }
 
   return <div className={styles.page}>
-    <header className={styles.siteHeader}><a href="/" className={styles.brand}><BrandMark/>cybershelf</a><a href="/" className={styles.homeLink}>Your reading corner <ArrowUpRight size={15}/></a></header>
+    <header className={styles.siteHeader}><a href="/" className={styles.brand}><BrandWordmark/></a><a href="/" className={styles.homeLink}>Your reading corner <ArrowUpRight size={15}/></a></header>
     <main className={styles.threadMain}>
       {loading ? <div className={styles.pageState} aria-busy="true"><LoaderCircle className="spin" size={24}/><p>Opening a moment in a reading life…</p></div> : loadError ? <div className={styles.pageState}><BookOpen size={30}/><h1>This page is quiet.</h1><p>{loadError}</p><button className="button secondary" onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/" className="text-button">Back to cybershelf <ArrowUpRight size={14}/></a></div> : thread ? <>
         <a className={styles.backLink} href={'/u/' + encodeURIComponent(thread.post.profileId)}><ArrowLeft size={14}/> {thread.post.name}’s reading life</a>
@@ -174,6 +174,6 @@ export default function ReadingThread({ id }: { id: string }) {
         </form> : <div hidden={checkingViewer} className={styles.signinPrompt}><h2>A story is better with company.</h2><p>Sign in to reply at this point in the book.</p><a className="button primary" href={signInPath(returnPath)}>Join the conversation <ArrowUpRight size={15}/></a></div>}
       </> : null}
     </main>
-    <footer className={styles.siteFooter}><a href="/" className={styles.brand}><BrandMark/>cybershelf</a><p>A home for your books. A little company for the journey.</p></footer>
+    <footer className={styles.siteFooter}><a href="/" className={styles.brand}><BrandWordmark/></a><p>A home for your books. A little company for the journey.</p></footer>
   </div>;
 }

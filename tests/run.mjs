@@ -12,8 +12,8 @@ mkdirSync(runtime, { recursive: true });
 const scratch = mkdtempSync(resolve(runtime, 'regression-'));
 const files = [
   'lib/types.ts', 'lib/demo.ts', 'lib/arrange.ts', 'lib/import.ts', 'lib/export.ts',
-  'lib/book-size.ts', 'lib/shelf-geometry.ts', 'lib/reading.ts', 'lib/reading-log.ts',
-  'tests/import.test.ts', 'tests/arrange.test.ts', 'tests/book-size.test.ts', 'tests/shelf-geometry.test.ts', 'tests/reading.test.ts', 'tests/reading-log.test.ts',
+  'lib/book-size.ts', 'lib/shelf-geometry.ts', 'lib/shelf-placement.ts', 'lib/shelf-actions.ts', 'lib/reading.ts', 'lib/reading-log.ts',
+  'tests/import.test.ts', 'tests/arrange.test.ts', 'tests/book-size.test.ts', 'tests/shelf-geometry.test.ts', 'tests/shelf-actions.test.ts', 'tests/reading.test.ts', 'tests/reading-log.test.ts',
 ];
 try {
   for (const file of files) {
@@ -35,6 +35,7 @@ try {
     resolve(scratch, 'tests/arrange.test.mjs'),
     resolve(scratch, 'tests/book-size.test.mjs'),
     resolve(scratch, 'tests/shelf-geometry.test.mjs'),
+    resolve(scratch, 'tests/shelf-actions.test.mjs'),
     resolve(scratch, 'tests/reading.test.mjs'),
     resolve(scratch, 'tests/reading-log.test.mjs'),
     resolve(root, 'tests/spoilers.test.mjs'),

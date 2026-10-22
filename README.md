@@ -2,15 +2,15 @@
 
 A place to collect books, arrange personal shelves, and keep a reading life within reach.
 
-cybershelf separates a **Library** from the shelves you make with it. A book can be something you own, borrowed, have read, or simply want to remember. Add it once, then display it on as many themed shelves as you like. The drawn mark keeps the original idea of two books leaning together, paired with a consistent serif-and-sans interface.
+cybershelf separates a **Library** from the shelves you make with it. A book can be something you own, borrowed, have read, or simply want to remember. Add it once, then display it on as many themed shelves as you like. The `cybershe\f` wordmark and `||\` icon echo upright and leaning books, paired with a consistent serif-and-sans interface.
 
-This repository contains version 0.2: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
+This repository contains version 0.3: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
 
 ## What you can do
 
 - **Collect books:** search book metadata, enter a title manually, import a Goodreads CSV, or upload an EPUB/PDF. File imports can attach another original to an existing book without replacing its reviews or notes.
 - **Make several shelves:** name and duplicate them, choose Open shelves, Cubby, or Tower, and combine Spines together, Gallery, or Stacks layouts with Paper, Warm oak, Moss, or Ink finishes.
-- **Arrange with control:** move books, change how they face, pin objects, and preview sorting by title, author, or stored cover color. Apply or cancel a preview, or undo a shelf edit. Smaller layouts keep overflow in **Not placed yet**.
+- **Arrange directly:** drag a book or decoration anywhere along a shelf, with a live ghost of its settled position. Books make room, join a horizontal stack, or lean against nearby support. Use the mouse wheel while dragging or the on-screen pose controls to choose Auto, Spine, Cover, Stack, or a lean. Touch, tap-to-place, and keyboard alternatives share the same placement engine. Every committed move can be undone; numbered slots and manual locks are gone.
 - **Make books feel physical:** use proportional heights and spine widths, tightly packed spines, cover-out displays, horizontal piles, and supported leaning. ISBN-specific metadata can improve dimensions; otherwise estimates work immediately. Fine-tune measurements or upload your own spine image.
 - **Decorate:** use the built-in plant, bear, robot, vase, and bookend, or upload a PNG, JPEG, or WebP image.
 - **Grab a book:** download your uploaded original, open a saved reading-platform or library link, or check the location of a physical copy. A catalog entry does not imply ownership.
@@ -27,7 +27,7 @@ The guest preview is labelled sample content. Editing as a guest creates a draft
 
 Goodreads support is a **CSV import**, not a live account connection. Reading-platform sources are links you save. Purchase announcements are manual, explicit shares. There is no automatic retailer purchase synchronization, DRM removal, cross-reader progress synchronization, OPDS server, or full in-browser EPUB reader in this release. Uploaded originals can be downloaded and opened in a compatible reader; platform links open the respective service.
 
-A shelf is useful for planning a physical arrangement. Books use approximate millimetre proportions and a constrained settling layout; crowded compartments scale together to fit the screen. This is a visual preview, not a guarantee that books fit a real bookcase. Metadata is often incomplete, so estimated dimensions are labelled and editable.
+A shelf is useful for planning a physical arrangement. Books use approximate millimetre proportions and continuous horizontal positions. The placement preview checks walls, neighboring books, and stack supports; a full row asks you to choose another spot or turn the book. Existing crowded arrangements still scale together to remain visible. This is a visual preview, not a guarantee that books fit a real bookcase. Metadata is often incomplete, so estimated dimensions are labelled and editable.
 
 ## Private libraries and deliberate sharing
 

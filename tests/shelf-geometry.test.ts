@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { layoutShelf, type PlacedShelfObject } from '../lib/shelf-geometry';
+import { findShelfSpace, materializeShelf, placeShelfItem } from '../lib/shelf-placement';
 import { newBook, newShelf, type Book, type Shelf, type ShelfItem } from '../lib/types';
 
 function book(id: string, heightMm = 210, widthMm = 135, thicknessMm = 24): Book {
@@ -142,6 +143,125 @@ test('mixed sizes, requested leans, piles, and all bookcases retain nonintersect
     const shelf = fixture(books, 'spine', { bookcase });
     shelf.items.forEach((item, index) => {
       item.facing = (['spine', 'stack', 'stack', 'cover'] as const)[(index + variation) % 4];
+      item.lean = (['auto', 'left', 'right', 'upright'] as const)[(index * 3 + variation) % 4];
+    });
+    assertSafe(shelf, books);
+  }
+});
+
+test('migrating an old arrangement keeps its continuous gaps, rows, and stack order', () => {
+  const books = [book('a'), book('b'), book('base'), book('top')], shelf = fixture(books);
+  shelf.items[1].slot = 5;
+  shelf.items[2].slot = 8; shelf.items[2].facing = 'stack';
+  shelf.items[3].slot = 9; shelf.items[3].facing = 'stack';
+  const before = objects(shelf, books), migrated = materializeShelf(shelf, books), after = objects(migrated, books);
+  assert.equal(migrated.items[3].placement?.supportId, 'item_base');
+  assert.equal(migrated.items[3].placement?.row, 1);
+  for (const prior of before) {
+    const current = after.find(item => item.itemId === prior.itemId)!;
+    near(current.x, prior.x); near(current.y, prior.y); near(current.width, prior.width);
+  }
+  assertSafe(migrated, books);
+});
+
+test('a free drop follows an arbitrary coordinate and manually lifts a formerly pinned item', () => {
+  const books = [book('free')], shelf = fixture(books); shelf.items[0].pinned = true;
+  const snapshot = JSON.stringify(shelf);
+  const result = placeShelfItem(shelf, books, 'item_free', { row: 2, x: .634, y: 90, mode: 'spine' });
+  assert.equal(result.valid, true); assert.equal(result.object?.row, 2);
+  near((result.object!.bounds.x + result.object!.bounds.width / 2) / 840, .634);
+  near(result.object!.bounds.y, 0);
+  assert.equal(result.shelf.items[0].pinned, false);
+  assert.equal(JSON.stringify(shelf), snapshot);
+  assert.deepEqual(result.geometry, layoutShelf(result.shelf, books), 'ghost and committed rendering are the same calculation');
+});
+
+test('a gallery row accepts more than four books based on their actual widths', () => {
+  const books = Array.from({ length: 12 }, (_, i) => book(`free${i}`, 210, 135, 24));
+  let shelf = fixture(books, 'spine', { layout: 'gallery' });
+  shelf.items = shelf.items.map(item => ({ ...item, slot: null }));
+  for (const item of shelf.items) {
+    const result = findShelfSpace(shelf, books, item.id);
+    assert.equal(result.valid, true); shelf = result.shelf;
+  }
+  assert.equal(objects(shelf, books).filter(item => item.row === 0).length, 12);
+  assert.equal(new Set(shelf.items.map(item => item.slot)).size, 12);
+  assertSafe(shelf, books);
+});
+
+test('dropping between books makes room without swapping or losing the neighbors', () => {
+  const books = ['a', 'b', 'c', 'moving'].map(id => book(id, 210, 135, 30));
+  const shelf = fixture(books);
+  shelf.items.forEach((item, i) => { item.placement = { row: i === 3 ? 1 : 0, x: i === 3 ? .6 : (250 + i * 30) / 840 }; });
+  const result = placeShelfItem(shelf, books, 'item_moving', { row: 0, x: 267 / 840, y: 0, mode: 'spine' });
+  assert.equal(result.valid, true); assert.equal(objects(result.shelf, books).length, 4);
+  const ordered = objects(result.shelf, books).sort((a, b) => a.x - b.x).map(item => item.itemId);
+  assert.deepEqual(ordered, ['item_a', 'item_moving', 'item_b', 'item_c']);
+  assertSafe(result.shelf, books);
+  assert.deepEqual(result.geometry, layoutShelf(result.shelf, books));
+});
+
+test('hovering over a horizontal pile infers a real stack and keeps the drop preview exact', () => {
+  const books = [book('base', 240, 150, 30), book('moving', 210, 140, 20)], shelf = fixture(books, 'stack');
+  shelf.items[0].placement = { row: 0, x: .4 }; shelf.items[1].slot = null;
+  const result = placeShelfItem(shelf, books, 'item_moving', { row: 0, x: .4, y: 60, mode: 'auto' });
+  assert.equal(result.valid, true); assert.equal(result.object?.facing, 'stack');
+  assert.equal(result.object?.supportId, 'item_base'); near(result.object!.bounds.y, 30);
+  assert.equal(result.shelf.items[1].placement?.supportId, 'item_base');
+  assert.deepEqual(result.geometry, layoutShelf(result.shelf, books));
+  assertSafe(result.shelf, books);
+});
+
+test('lifting a bottom or middle book settles the remaining pile on its old row', () => {
+  const books = [book('base', 240, 150, 30), book('middle', 210, 140, 20), book('top', 180, 120, 15)];
+  for (const moved of ['base', 'middle']) {
+    const shelf = fixture(books, 'stack');
+    const result = placeShelfItem(shelf, books, `item_${moved}`, { row: 1, x: .65, y: 0, mode: 'stack' });
+    assert.equal(result.valid, true);
+    const placed = objects(result.shelf, books), remaining = placed.filter(item => item.row === 0).sort((a, b) => a.y - b.y);
+    assert.equal(remaining.length, 2); near(remaining[0].bounds.y, 0); near(remaining[1].bounds.y, remaining[0].height);
+    assert.equal(result.shelf.items.find(item => item.id === remaining[0].itemId)?.placement?.supportId, undefined);
+    assert.equal(result.shelf.items.find(item => item.id === remaining[1].itemId)?.placement?.supportId, remaining[0].itemId);
+    assertSafe(result.shelf, books);
+  }
+});
+
+test('free leaning meets walls and shorter piles without intersection or hovering', () => {
+  const books = [book('base', 230, 150, 30), book('top', 200, 130, 20), book('lean', 235, 150, 25)];
+  const shelf = fixture(books, 'stack');
+  shelf.items[0].placement = { row: 0, x: .35 };
+  shelf.items[1].placement = { row: 0, x: .35, supportId: 'item_base' };
+  shelf.items[2].slot = null;
+  const result = placeShelfItem(shelf, books, 'item_lean', { row: 0, x: (840 * .35 + 115 + 32) / 840, y: 0, mode: 'lean-left' });
+  assert.equal(result.valid, true); assert.ok(result.object!.angle < 0);
+  assert.ok(objects(result.shelf, books).filter(object => object.itemId !== 'item_lean').some(object => touching(object, result.object!)));
+  assert.equal(result.shelf.items[2].placement?.supportId, undefined, 'a side lean does not become a vertical pile link');
+  assertSafe(result.shelf, books);
+  for (const [x, mode, wall] of [[0, 'lean-left', 'wall-left'], [1, 'lean-right', 'wall-right']] as const) {
+    const wallShelf = fixture([books[2]]);
+    const atWall = placeShelfItem(wallShelf, [books[2]], 'item_lean', { row: 0, x, y: 0, mode });
+    assert.equal(atWall.valid, true); assert.equal(atWall.object!.supportId, wall);
+    assertSafe(atWall.shelf, [books[2]]);
+  }
+});
+
+test('a physically full row produces a blocked preview instead of silently replacing a book', () => {
+  const books = Array.from({ length: 7 }, (_, i) => book(`cover${i}`, 210, 135, 24)), shelf = fixture(books, 'cover');
+  shelf.items.forEach((item, i) => { item.placement = { row: i === 6 ? 1 : 0, x: (75 + i * 135) / 840 }; });
+  const snapshot = JSON.stringify(shelf), result = placeShelfItem(shelf, books, 'item_cover6', { row: 0, x: .6, y: 0, mode: 'cover' });
+  assert.equal(result.valid, false); assert.ok(result.object); assert.equal(objects(result.shelf, books).length, 7);
+  assert.equal(JSON.stringify(shelf), snapshot);
+  assert.match(result.hint, /room/i);
+  assertSafe(result.shelf, books);
+});
+
+test('free coordinates stay bounded and collision-free in every bookcase with mixed dimensions', () => {
+  for (const bookcase of ['open', 'cubby', 'tower'] as const) for (let variation = 0; variation < 12; variation++) {
+    const books = Array.from({ length: 9 }, (_, index) => book(`free${index}`, 120 + (index * 31 + variation * 13) % 260, 70 + (index * 17 + variation * 9) % 180, 5 + (index * 11 + variation * 7) % 50));
+    const shelf = fixture(books, 'spine', { bookcase });
+    shelf.items.forEach((item, index) => {
+      item.placement = { row: index % 3, x: ((index * 17 + variation * 11) % 101) / 100 };
+      item.facing = (['spine', 'stack', 'cover'] as const)[(index + variation) % 3];
       item.lean = (['auto', 'left', 'right', 'upright'] as const)[(index * 3 + variation) % 4];
     });
     assertSafe(shelf, books);

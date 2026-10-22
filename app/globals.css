@@ -18,6 +18,8 @@
 :root { --muted: #687262; }
 .brand { font-family: var(--serif); font-size: 26px; font-weight: 400; letter-spacing: -.85px; gap: 10px; }
 .brand-symbol { display: inline-block; width: 28px; height: 28px; flex-shrink: 0; vertical-align: middle; }
+.brand-wordmark { white-space: nowrap; font-family: var(--serif); font-weight: 400; letter-spacing: -.035em; }
+.brand-slash { display: inline; margin: 0 .015em; }
 .sidebar .brand-symbol { width: 30px; height: 30px; }
 .sidebar-caption { font-family: var(--sans); font-size: 11px; letter-spacing: 0; line-height: 1.7; color: #77816f; margin-top: 12px; }
 .main-nav > button { font-size: 13px; min-height: 43px; }
@@ -41,6 +43,10 @@
 .button.small { min-height: 35px; font-size: 11px; }
 .heading-actions .button { font-size: 12px; }
 .heading-actions .icon-button { width: 41px; height: 41px; }
+.heading-actions { flex-wrap: wrap; }
+.tray-item { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; min-height: 44px; }
+.tray-item:active { cursor: grabbing; }
+.selection-actions .text-button { min-height: 44px; padding-inline: 8px; }
 .text-button { font-size: 12px; }
 .shelf-meta { font-size: 11px; flex-wrap: wrap; color: #727e65; }
 .shelf-privacy { font-size: 11px; }

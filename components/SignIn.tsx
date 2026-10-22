@@ -12,6 +12,7 @@ import {
 import DecorArt from './DecorArt';
 import styles from './SignIn.module.css';
 import BrandMark from './BrandMark';
+import BrandWordmark from './BrandWordmark';
 
 type Mode = 'sign-in' | 'sign-up';
 type AuthError = { code?: string; message?: string };
@@ -120,7 +121,7 @@ export default function SignIn({ returnTo, available }: { returnTo: string; avai
 
   return <div className={styles.page}>
     <header className={styles.header}>
-      <a className={styles.brand} href="/" aria-label="cybershelf home"><BrandMark/>cybershelf</a>
+      <a className={styles.brand} href="/" aria-label="cybershelf home"><BrandWordmark/></a>
       <a className={styles.back} href={destination}><ArrowLeft size={14} aria-hidden="true"/>Back to shelves</a>
     </header>
 

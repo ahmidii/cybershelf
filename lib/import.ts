@@ -1,4 +1,4 @@
-import { newBook, shelfCapacity, uid } from './types';
+import { newBook, shelfCapacity, shelfGrid, shelfPlacementError, uid } from './types';
 import type { AppState, Book, BookSource, ReadingLogEntry, ReadingStatus, Shelf, ShelfItem } from './types';
 import { validBookDimensions } from './book-size';
 
@@ -363,6 +363,16 @@ export function parseCatalogJSON(text: string): AppState {
         slot: slot !== null && slot >= shelfCapacity(shelf) ? null : slot, pinned: item.pinned === true,
         facing: enumValue(item.facing ?? 'auto', ['auto', 'spine', 'cover', 'stack'] as const, 'book facing'),
       };
+      if (item.placement !== undefined) {
+        const placement=object(item.placement,'shelf placement');
+        const row=number(placement.row,'shelf row',0,shelfGrid(shelf).rows-1);
+        if(!Number.isInteger(row))throw new Error('Invalid backup: shelf rows must be whole numbers.');
+        if(slot===null)throw new Error('Invalid backup: an item in the tray cannot have a shelf placement.');
+        if(slot>1000)throw new Error('Invalid backup: shelf item identifiers must be at most 1000.');
+        result.slot=slot;
+        result.placement={row,x:number(placement.x,'shelf placement',0,1),
+          ...(placement.supportId===undefined?{}:{supportId:id(placement.supportId,'shelf support')})};
+      }
       if (item.lean !== undefined) result.lean = enumValue(item.lean, ['auto', 'upright', 'left', 'right'] as const, 'book lean');
       if (result.kind === 'book') {
         result.bookId = id(item.bookId, 'shelf book ID');
@@ -378,6 +388,8 @@ export function parseCatalogJSON(text: string): AppState {
     unique(shelf.items.map(item => item.id), 'shelf items');
     const occupied = shelf.items.filter(item => item.slot !== null).map(item => String(item.slot));
     unique(occupied, 'shelf positions');
+    const placementError=shelfPlacementError(shelf);
+    if(placementError)throw new Error(`Invalid backup: ${placementError}`);
     return shelf;
   });
   unique(shelves.map(shelf => shelf.id), 'shelves');

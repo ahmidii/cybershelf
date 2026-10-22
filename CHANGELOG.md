@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 — Direct shelf placement — 2026-10-22
+
+### Changed
+
+- Replaced numbered placement cells with continuous positions along each shelf. Dragging works directly in the private shelf view, without opening shelf options first.
+- Added a live landing ghost using the same deterministic solver as the final drop, with neighboring books making room, supported leaning, and horizontal piles.
+- Added mouse-wheel pose cycling during a drag, visible touch-friendly pose controls, tap-to-place, keyboard movement, cancellation, and one-step undo.
+- Removed the manual pin and numbered-position controls. Direct movement also releases a retained legacy pin.
+- Books and decorations can be dragged back from the staging tray. Adding a new object searches for physical space instead of an empty numbered slot.
+- Continuous coordinates and stack relationships survive saved libraries, backups, public shelf/profile snapshots, shelf duplication, and copied arrangements. Old arrangements and backups remain supported; no database migration is needed.
+- Added the `||\` icon and favicon, with `cybershe\f` as the wordmark.
+- Preserved intervening moves when a decoration upload finishes, pruned deleted books from undo history, and cleared stale previews/history when replacing or reloading a catalog.
+
+
 ## 0.2.0 — Shelves with character, reading with company — 2026-10-22
 
 ### Added

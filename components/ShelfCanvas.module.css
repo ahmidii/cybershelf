@@ -21,8 +21,9 @@
 .item:disabled{opacity:1;cursor:default}
 .item:not(:disabled):hover{filter:brightness(1.065);z-index:5}
 .item:focus-visible{outline:2px solid #486140;z-index:7}
-.editing .item{cursor:grab}
-.editing .item:active{cursor:grabbing}
+.interactive .item{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.interactive .item:active{cursor:grabbing}
+@media(any-pointer:coarse){.interactive .item::before{content:"";position:absolute;left:50%;top:-4px;bottom:-4px;width:calc(100% + 10px);min-width:22px;transform:translateX(-50%);background:transparent}}
 .book{display:block;position:relative;width:100%;height:100%;color:var(--book-ink);background:var(--book-color);border:.5px solid #00000012;border-radius:1px 2px 1px 1px;box-shadow:1px 1px 2px #30291f28,1px 0 1px #ffffff30 inset,-1px 0 1px #00000018 inset;overflow:hidden;text-align:left}
 .spine{background:linear-gradient(90deg,#00000010,transparent 12%,#ffffff13 19%,transparent 42%,#00000005 86%,#00000019),var(--book-color)}
 .spine::before,.spine::after{content:"";position:absolute;left:14%;right:14%;border-top:.5px solid currentColor;opacity:.26;z-index:1}
@@ -58,10 +59,6 @@
 .selected{outline:2px solid #68845a;outline-offset:3px;z-index:6}
 .selected::after{content:"";position:absolute;left:calc(50% - 3px);bottom:-6px;width:6px;height:6px;border-radius:50%;background:#68845a;box-shadow:0 0 0 2px #f1f1e8;pointer-events:none}
 .ink .selected{outline-color:#e6f0ce}.ink .selected::after{background:#e6f0ce}
-.pin{position:absolute;right:-5px;top:-17px;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;background:#f8f5e9f5;color:#657152;z-index:5;box-shadow:0 1px 2px #00000010;pointer-events:none}
-.pin svg{width:11px;height:11px;fill:currentColor;stroke:currentColor;stroke-linecap:round;stroke-width:1}
-.dragging{opacity:.35}
-.over{outline:2px dashed #617e50;outline-offset:5px}
 .missing{font:clamp(5px,1cqw,10px)/1.4 var(--sans,Arial,sans-serif);color:#655e4b;display:grid;place-items:center;height:100%;border:1px solid #a5997f;background:#e0dacb;text-align:center;padding:4px}
 .tower{max-width:420px;margin-inline:auto}
 .tower .spineText{font-size:clamp(8px,2.6cqw,15px)}
@@ -69,21 +66,40 @@
 .tower .coverTitle{font-size:clamp(10px,4cqw,24px)}
 .tower .coverAuthor{font-size:clamp(5px,1.2cqw,8px)}
 .tower .stack .spineText{font-size:clamp(6px,1.8cqw,12px)}
-.placementHint{font:11px/1.6 var(--sans,Arial,sans-serif);color:#67715e;margin:0 0 12px;min-height:35px}
-.positions{display:grid;grid-template-columns:repeat(var(--columns),minmax(0,1fr));gap:3px;padding:6px 0 9px;background:var(--case);position:relative;z-index:8}
-.position{appearance:none;display:flex;align-items:center;justify-content:center;gap:5px;position:relative;min-width:0;height:34px;padding:0 4px;border:1px solid #ffffff33;border-radius:4px;background:#ffffff26;color:#545b4c;font:11px/1 var(--sans,Arial,sans-serif);font-variant-numeric:tabular-nums;transition:background .16s,outline .16s}
-.position:disabled{opacity:.55;cursor:default}
-.position:not(:disabled):hover{background:#ffffff6b}
-.position i{width:5px;height:12px;display:block;border-radius:1px;flex:none;box-shadow:0 0 0 .5px #00000010}
-.position svg{width:10px;height:10px;fill:currentColor;stroke:currentColor;stroke-width:1;position:absolute;right:2px;top:3px;opacity:.7}
-.occupied{background:#ffffff45;border-color:#ffffff55}
-.positionSelected{background:#f6f7ed;border-color:#68845a;box-shadow:0 0 0 1px #68845a;color:#3d5433}
-.positionOver{background:#d2dfc4!important;outline:2px solid #647f51;outline-offset:-2px}
-.ink .position{color:#edf0e7;background:#ffffff0d;border-color:#ffffff22}
-.ink .occupied{background:#ffffff1c}
-.ink .positionSelected{color:#f4f9e8;background:#ffffff32;border-color:#d6e5bc;box-shadow:0 0 0 1px #d6e5bc}
-.editing .row:last-child .plank{margin-inline:-4px;border-radius:0;height:13px}
-.editing .row:last-child .positions{margin:0 -17px;padding:7px 17px 10px;border-radius:0 0 2px 2px}
+/* The plank is one continuous surface. There are no drop cells. */
+.placementHint{font:11px/1.6 var(--sans,Arial,sans-serif);color:#67715e;margin:0 0 12px;min-height:18px}
+.inMotion{cursor:grabbing}
+.inMotion .item{pointer-events:none;transition:left .14s cubic-bezier(.2,.8,.2,1),bottom .14s cubic-bezier(.2,.8,.2,1),width .14s, height .14s,transform .14s}
+.ghost{opacity:.62;outline:2px dashed #5d7e4c;outline-offset:4px;z-index:9;filter:drop-shadow(0 5px 5px #415b3524);animation:none!important;transition:none!important}
+.ghost::after{content:"";position:absolute;inset:-5px;border-radius:4px;background:#b6d39a14;pointer-events:none}
+.blocked{outline-color:#a25d4e;filter:grayscale(.35);opacity:.48}
+.blocked::after{background:#b56e6e15}
+.sourceTrace{pointer-events:none;outline:1px dashed #62725350;outline-offset:1px;background:#90a67d08;animation:none!important;transition:none!important;z-index:0}
+.targetRow .plank{box-shadow:0 -2px 0 #78946580,0 5px 8px -4px var(--shelf-shadow)}
+.ink .ghost{outline-color:#d5e8b5}.ink .sourceTrace{outline-color:#d8e6c070}.ink .targetRow .plank{box-shadow:0 -2px 0 #cadfaf9c,0 5px 8px -4px var(--shelf-shadow)}
+.srOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.palette{position:fixed;z-index:80;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(460px,calc(100vw - 24px));padding:11px 13px 10px;border:1px solid #d7ddcb;border-radius:14px;background:#fafbf5f7;color:#3a4c33;box-shadow:0 8px 40px #283c2426,0 1px 3px #283c2412;backdrop-filter:blur(16px);font-family:var(--sans,Arial,sans-serif);box-sizing:border-box;isolation:isolate;animation:paletteArrival .16s ease-out}
+.palette *{box-sizing:border-box}
+.paletteHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 0 7px;font-size:12px;line-height:1.3}
+.paletteHeading>span{white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-weight:500}
+.paletteHeading>button{border:0;border-radius:6px;padding:3px 4px 3px 8px;min-height:30px;display:flex;gap:5px;align-items:center;background:transparent;color:#6e7c63;font-size:11px;flex:none}
+.paletteHeading>button:hover{background:#e8edde}
+.paletteHeading svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round}
+.modeOptions{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.modeOptions>button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:8px 2px;min-height:57px;border:1px solid transparent;background:transparent;border-radius:8px;color:#66765c;font:10px/1.15 var(--sans,Arial,sans-serif);touch-action:manipulation;white-space:nowrap;transition:background .14s,border-color .14s}
+.modeOptions>button:hover{background:#ebefdf}
+.modeOptions>button>svg{width:22px;height:22px}
+.modeOptions>button.modeActive{background:#e3ebd6;color:#34512c;border-color:#b3c59c}
+.paletteFooter{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding-top:8px;border-top:1px solid #e1e7d7;font-size:10px;line-height:1.5;color:#728168;min-height:34px}
+.paletteFooter>span{flex:1}
+.placeButton,.moveButton{appearance:none;display:inline-flex;align-items:center;justify-content:center;flex:none;font:11px/1.2 var(--sans,Arial,sans-serif);border:1px solid #c8d4b9;background:#eef3e5;border-radius:7px;min-height:32px;padding:7px 11px;color:#405d33;cursor:pointer}
+.placeButton{background:#48663b;color:#fff;border-color:#48663b}
+.placeButton:disabled{opacity:.45;cursor:default}
+.palette button:focus-visible{outline:2px solid #66864f;outline-offset:2px}
+.dragTag{position:fixed;z-index:85;display:flex;gap:7px;align-items:center;max-width:170px;min-height:32px;pointer-events:none;padding:7px 11px;border:1px solid #b7c4a6;border-radius:20px;color:#3b5731;background:#f8fbedf5;box-shadow:0 3px 12px #31462619;font:11px/1.3 var(--sans,Arial,sans-serif)}
+.dragTag>svg{width:17px;height:17px;flex:none}
+.dragTagBlocked{background:#fbf1ecf5;border-color:#d8b4a7;color:#8a5545}
+@keyframes paletteArrival{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
 .compact{padding:8px 4px 0;pointer-events:none}
 .compact .case{padding:9px 10px 0}
 .compact .plank{height:8px;margin:0 -2px}
@@ -102,9 +118,11 @@
 @keyframes arrive{from{opacity:.7;translate:0 -3px}to{opacity:1;translate:0 0}}
 @media(max-width:600px){
   .canvas{padding:8px 0 0}.case{padding:10px 11px 0}.plank{height:10px;margin-inline:-2px}.row:last-child .plank{height:13px;margin-inline:-12px}
-  .feet{height:10px;padding-inline:26px}.feet i{width:19px}.placementHint{font-size:10px;margin-bottom:10px;min-height:32px}
-  .positions{gap:3px;padding:5px 0 7px}.position{height:36px;gap:3px;font-size:10px;padding:0 2px}.position i{height:10px;width:4px}
-  .position svg{right:0;top:1px;width:8px;height:8px}.pin{width:13px;height:13px;right:-4px;top:-14px}.pin svg{width:9px;height:9px}
-  .editing .row:last-child .plank{margin-inline:-2px;height:10px}.editing .row:last-child .positions{margin:0 -11px;padding:6px 11px 8px}
+  .feet{height:10px;padding-inline:26px}.feet i{width:19px}.placementHint{font-size:10px;margin-bottom:10px;min-height:16px}
+  .palette{padding:8px 9px 9px;bottom:max(10px,env(safe-area-inset-bottom));border-radius:12px}
+  .paletteHeading{font-size:11px;padding-bottom:4px}.paletteHeading>button{min-height:34px}
+  .modeOptions{gap:2px}.modeOptions>button{min-height:53px;font-size:9px;gap:5px;padding:7px 1px}.modeOptions>button>svg{width:21px;height:21px}
+  .paletteFooter{font-size:10px;margin-top:7px;padding-top:7px;gap:8px}.moveButton,.placeButton{min-height:35px;font-size:10px;padding:7px 9px}
+  .dragTag{font-size:10px;max-width:160px;padding:6px 9px}
 }
-@media(prefers-reduced-motion:reduce){.item,.position{animation:none;transition:none}}
+@media(prefers-reduced-motion:reduce){.item,.palette,.modeOptions>button{animation:none;transition:none}.inMotion .item{transition:none}}

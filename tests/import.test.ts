@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseGoodreadsCSV, parseCatalogJSON, mergeBooks, mergeImportedBooks, readBookFile } from '../lib/import';
 import { catalogJSON, catalogCSV, createBackupArchive } from '../lib/export';
 import { createDemoState } from '../lib/demo';
-import { newBook } from '../lib/types';
+import { newBook, type ShelfItem } from '../lib/types';
 
 test('Goodreads CSV preserves multiline reviews, commas, escaped quotes, ISBN wrappers, and reading state', () => {
   const csv = '\uFEFFTitle,Author,ISBN13,My Rating,Exclusive Shelf,My Review,Date Read\r\n"A book, in parts",A. Writer,"=""9781234567890""",4.5,read,"Line one\nA ""quoted"" thought",2025/02/28\r\n';
@@ -141,6 +141,45 @@ test('JSON restore moves overflowing positions to the staging tray instead of lo
   const result = parseCatalogJSON(JSON.stringify(state));
   assert.equal(result.shelves[0].items.length, state.shelves[0].items.length);
   assert.ok(result.shelves[0].items.some(item => item.slot === null));
+});
+
+test('continuous shelf positions and stacks round-trip beyond the former gallery slot limit', () => {
+  const state=createDemoState();
+  const shelf=state.shelves[0];shelf.layout='gallery';
+  shelf.items=shelf.items.filter(item=>item.kind==='book').slice(0,6).map((item,index)=>({
+    ...item,slot:100+index,facing:index<2?'stack':'spine',placement:{row:0,x:index<2?.2:.25+index*.12},
+  }));
+  shelf.items[1].placement!.supportId=shelf.items[0].id;
+  state.shelves=[shelf];
+  const raw=JSON.parse(catalogJSON(state));raw.shelves[0].items[0].placement.privateField='DO_NOT_RESTORE';
+  const result=parseCatalogJSON(JSON.stringify(raw));
+  assert.deepEqual(result.shelves[0].items.map(item=>item.placement),shelf.items.map(item=>item.placement));
+  assert.deepEqual(result.shelves[0].items.map(item=>item.slot),[100,101,102,103,104,105]);
+  assert.equal(JSON.stringify(result).includes('DO_NOT_RESTORE'),false);
+});
+
+test('backup import rejects invalid continuous positions and unsafe support graphs', () => {
+  const state=createDemoState(),shelf=state.shelves[0];
+  shelf.items=shelf.items.filter(item=>item.kind==='book').slice(0,2).map((item,index)=>({
+    ...item,slot:40+index,facing:'stack',placement:{row:0,x:.4},
+  }));
+  state.shelves=[shelf];
+  for(const mutate of [
+    (items:ShelfItem[])=>items[0].placement!.x=-.01,
+    (items:ShelfItem[])=>items[0].placement!.x=1.01,
+    (items:ShelfItem[])=>items[0].placement!.x=Infinity,
+    (items:ShelfItem[])=>items[0].placement!.row=3,
+    (items:ShelfItem[])=>items[0].placement!.row=.5,
+    (items:ShelfItem[])=>items[0].placement!.supportId='missing',
+    (items:ShelfItem[])=>items[0].placement!.supportId=items[0].id,
+    (items:ShelfItem[])=>{items[0].placement!.supportId=items[1].id;items[1].placement!.row=1;},
+    (items:ShelfItem[])=>{items[0].placement!.supportId=items[1].id;items[1].placement!.supportId=items[0].id;},
+    (items:ShelfItem[])=>items[0].slot=null,
+    (items:ShelfItem[])=>items[0].slot=1001,
+  ]){
+    const invalid=JSON.parse(catalogJSON(state));mutate(invalid.shelves[0].items);
+    assert.throws(()=>parseCatalogJSON(JSON.stringify(invalid)),/Invalid backup/);
+  }
 });
 
 test('CSV export neutralizes spreadsheet formulas and preserves quotes and multiline text', () => {

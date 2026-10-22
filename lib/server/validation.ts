@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { shelfCapacity, type AppState, type Book, type Publication, type PublicProfile, type ReadingLogEntry } from '../types';
+import { shelfCapacity, shelfPlacementError, type AppState, type Book, type Publication, type PublicProfile, type ReadingLogEntry } from '../types';
 
 export const idSchema = z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
 const text = (max: number) => z.string().max(max);
@@ -33,6 +33,7 @@ const item = z.object({
   assetId:idSchema.optional(), imageUrl:imageUrl.optional(), label:text(150).optional(), slot:z.number().int().min(0).max(1000).nullable(),
   pinned:z.boolean(), facing:z.enum(['auto','spine','cover','stack']),
   lean:z.enum(['auto','upright','left','right']).optional(),
+  placement:z.object({row:z.number().int().min(0).max(3),x:z.number().finite().min(0).max(1),supportId:idSchema.optional()}).optional(),
 });
 const shelf = z.object({
   id:idSchema, title:z.string().min(1).max(150), description:text(2000), bookcase:z.enum(['open','cubby','tower']),
@@ -63,10 +64,12 @@ export const stateSchema = z.object({
       if (i.kind === 'decor' && !i.decor) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Decoration type is missing'});
       if (i.kind === 'decor' && i.decor === 'image' && !i.assetId && !i.imageUrl) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Decoration image is missing'});
       if (i.slot !== null) {
-        if (i.slot >= shelfCapacity(s) || slots.has(i.slot)) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Two objects occupy a position, or a position is outside this shelf'});
+        if ((!i.placement && i.slot >= shelfCapacity(s)) || slots.has(i.slot)) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Two objects occupy a position, or a legacy position is outside this shelf'});
         slots.add(i.slot);
       }
     }
+    const placementError=shelfPlacementError(s);
+    if(placementError)ctx.addIssue({code:z.ZodIssueCode.custom,message:placementError});
   }
   if(state.profile.featuredShelfId&&!shelves.has(state.profile.featuredShelfId))ctx.addIssue({code:z.ZodIssueCode.custom,message:'Choose an existing shelf for your profile',path:['profile','featuredShelfId']});
 });
@@ -116,12 +119,15 @@ export function makePublication(state:AppState, shelfId:string, id:string, publi
   if (!original) throw new Error('Shelf not found');
   const publicImage=(value:string)=>publicArtwork(value,id,imageIds,surface);
   const visible = original.items.filter(i=>i.slot!==null);
+  const visibleIds=new Set(visible.map(i=>i.id));
   const bookIds=new Set(visible.filter(i=>i.kind==='book').map(i=>i.bookId));
   const books=state.books.filter(b=>bookIds.has(b.id)).map(book=>publicBook(book,id,imageIds,surface));
   const items=visible.map(i=>{
-    if(i.kind==='book') return {id:i.id,kind:'book' as const,bookId:i.bookId,slot:i.slot,pinned:i.pinned,facing:i.facing,...(i.lean?{lean:i.lean}:{})};
+    const placement=i.placement?{placement:{row:i.placement.row,x:i.placement.x,
+      ...(i.placement.supportId&&i.placement.supportId!==i.id&&visibleIds.has(i.placement.supportId)?{supportId:i.placement.supportId}:{})}}:{};
+    if(i.kind==='book') return {id:i.id,kind:'book' as const,bookId:i.bookId,slot:i.slot,pinned:i.pinned,facing:i.facing,...(i.lean?{lean:i.lean}:{}),...placement};
     const imageId=i.assetId??privateImageId(i.imageUrl)??undefined;
-    return {id:i.id,kind:'decor' as const,decor:i.decor,slot:i.slot,pinned:i.pinned,facing:i.facing,label:i.label,
+    return {id:i.id,kind:'decor' as const,decor:i.decor,slot:i.slot,pinned:i.pinned,facing:i.facing,label:i.label,...placement,
       ...(imageId && imageIds.has(imageId) ? {imageUrl:`/api/${surface==='profile'?'profiles':'publications'}/${id}/assets/${imageId}`} : i.imageUrl ? {imageUrl:publicImage(i.imageUrl)} : {})};
   });
   return {id,name:state.profile.name,books,bookCount:books.length,publishedAt,shelf:{

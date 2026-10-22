@@ -5,7 +5,7 @@ import { ArrowUpRight,Copy,LoaderCircle,Star } from 'lucide-react';
 import type { PublicBook,PublicProfile as Profile } from '@/lib/types';
 import ShelfCanvas from './ShelfCanvas';
 import BookCover from './BookCover';
-import BrandMark from './BrandMark';
+import BrandWordmark from './BrandWordmark';
 import FollowButton from './FollowButton';
 import ProfileJournal from './ProfileJournal';
 import { Modal } from './Dialogs';
@@ -25,7 +25,7 @@ export default function PublicProfile({id}:{id:string}){
   },[id]);
   const openBook=(book:PublicBook|null)=>{setSelected(book);setCopied(false);};
   return <div className={styles.publicPage}>
-    <header className={styles.publicHeader}><a href="/" className={styles.brand} aria-label="Cybershelf home"><BrandMark/>cybershelf</a><a href="/" className={styles.homeLink}>Make yourself a shelf <ArrowUpRight size={16}/></a></header>
+    <header className={styles.publicHeader}><a href="/" className={styles.brand} aria-label="Cybershelf home"><BrandWordmark/></a><a href="/" className={styles.homeLink}>Make yourself a shelf <ArrowUpRight size={16}/></a></header>
     <main className={styles.publicMain}>
       {loading?<div className={styles.pageState} aria-busy="true"><LoaderCircle size={26} className="spin"/><p>Opening a reader’s corner…</p></div>:error?<div className={styles.pageState}><h1>Profile unavailable</h1><p>{error}</p><a href="/" className="button primary">Explore cybershelf <ArrowUpRight size={15}/></a></div>:profile?<>
         <header className={`${styles.identity} ${styles.publicIdentity}`}><span className={styles.avatar} aria-hidden="true">{profile.name.slice(0,1).toLocaleUpperCase()}</span><div><p className={styles.kicker}>A reader on cybershelf</p><h1>{profile.name}</h1>{profile.bio?<p className={styles.bio}>{profile.bio}</p>:null}</div><FollowButton profileId={profile.id} className={styles.publicFollow}/></header>
@@ -39,7 +39,7 @@ export default function PublicProfile({id}:{id:string}){
         <section className={styles.invitation}><div><h2>A shelf can say a lot about you.</h2><p>Collect your books. Make a little world of your own.</p></div><a href="/" className="button primary">Start your shelf <ArrowUpRight size={15}/></a></section>
       </>:null}
     </main>
-    <footer className={styles.publicFooter}><a href="/" className={styles.brand}><BrandMark/>cybershelf</a><p>A home for your books.</p></footer>
+    <footer className={styles.publicFooter}><a href="/" className={styles.brand}><BrandWordmark/></a><p>A home for your books.</p></footer>
     {selected&&<Modal title={selected.title} subtitle={selected.author} onClose={()=>setSelected(null)}><div className={`${styles.publicBookDetail} dialog-body`}><BookCover book={selected}/><p>Featured on {profile?.name}’s shelf. Keep the title for your next visit to a bookshop or library.</p><button className="button secondary" onClick={async()=>{try{await navigator.clipboard.writeText(selected.title+' — '+selected.author);setCopied(true);}catch{setCopied(false);}}}><Copy size={14}/>{copied?'Book details copied':'Copy title & author'}</button><a href="/" className="text-button">Create your own bookshelf <ArrowUpRight size={13}/></a></div></Modal>}
   </div>;
 }

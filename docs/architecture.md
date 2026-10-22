@@ -10,7 +10,7 @@ This document describes version 0.2 as implemented. The app runs on Vinext/React
 | Book | Metadata, reading state, personal writing, and optional sources. |
 | Source | An uploaded original, reading-platform link, other link, or physical location. |
 | Shelf | A named arrangement referencing library book IDs and decorative objects. |
-| Placement | One book or decoration in a numbered slot, or `null` for the staging tray. |
+| Placement | One book or decoration with a row, normalized horizontal center, and optional supporting item; the legacy `slot: null` marker identifies the staging tray. |
 | Publication | An explicitly created shelf snapshot with a public field allowlist. |
 | Public profile | A separately published identity, bio, and featured-shelf snapshot. |
 | Reading entry | A private thought or milestone with its own time, page, and percentage. |
@@ -18,15 +18,21 @@ This document describes version 0.2 as implemented. The app runs on Vinext/React
 | Reply | A public response attached to one reading post, with a spoiler-progress marker. |
 | Follow | An authenticated reader’s subscription to another reader’s public activity. |
 
-Types and shared layout rules live in [`lib/types.ts`](../lib/types.ts). A book can appear on several shelves. Removing a placement retains the library entry; removing a library entry also removes its placements. Bookcase structure and display layout determine a finite number of positions. Decorations consume positions too.
+Types and shared layout rules live in [`lib/types.ts`](../lib/types.ts). A book can appear on several shelves. Removing a placement retains the library entry; removing a library entry also removes its placements. Bookcase structure determines rows and physical compartments. Continuous placements are limited by available physical space, not a fixed number of grid cells. Legacy slot identifiers remain for compatibility and visibility checks, but do not determine free-position coordinates.
 
-Sorting uses the positions of movable books already on the shelf. Pins, decorations, intentional gaps, and staged objects remain in place. Color sorting uses the stored hex color: local EPUB cover art can supply a sampled color, and readers can edit the color. Goodreads-only records receive a deterministic fallback because their CSV has no artwork.
+Sorting uses the positions of movable books already on the shelf. A continuous position includes its facing, lean, and stack role; support references follow the book occupying that role. Decorations, intentional gaps, staged objects, and retained legacy pins remain in place during sorting. Direct manipulation always releases the moved item from a legacy pin. Color sorting uses the stored hex color: local EPUB cover art can supply a sampled color, and readers can edit the color. Goodreads-only records receive a deterministic fallback because their CSV has no artwork.
 
 ## Physical shelf layout
 
 `lib/book-size.ts` supplies stable millimetre dimensions. Stored measurements win; format and page count provide bounded estimates. ISBN lookup accepts matching edition metadata, labels the source, and falls back when data is missing. Spine artwork is optional and separately editable; generated spines are not claimed to be actual publisher images.
 
-`lib/shelf-geometry.ts` turns numbered positions into adjacent groups. Consecutive upright spines pack edge to edge; consecutive horizontal books form piles using cumulative thickness. A leaning book needs a wall, upright neighbour, horizontal pile, or bookend within reach. Collision and contact geometry are deterministic. Empty positions preserve spaces between groups, and a whole compartment scales uniformly if crowded. This is constrained placement with settling transitions, not a continuous physics engine or physical-fit calculation. Reduced-motion preferences disable settling animation. The numbered position rail preserves tap and keyboard alternatives to dragging.
+`lib/shelf-geometry.ts` renders continuous positions from `placement: { row, x, supportId? }`, where `x` is the normalized horizontal center across the row. Legacy numbered arrangements are rendered faithfully until they are materialized into coordinates. Horizontal piles use explicit support chains and cumulative book thickness. A leaning book needs a wall, upright neighbour, horizontal pile, or bookend within reach. Collision and contact geometry are deterministic.
+
+`lib/shelf-placement.ts` supplies one pure operation for the drag preview and final placement. It lifts the selected item, settles the remaining pile, finds the intended compartment, checks possible stack supports, snaps nearby edges, and moves neighboring items only as needed. The result includes the exact geometry, validity, and a short contextual placement hint. Coordinates are saved from the settled result so other books do not spring back to old pointer targets on a later edit. A full row cannot accept another footprint; existing oversized arrangements remain visible through uniform scaling.
+
+`components/ShelfCanvas.tsx` uses Pointer Events for mouse, pen, and touch instead of native HTML drag-and-drop. Continuous pointer coordinates drive a translucent landing ghost. Wheel input during a drag and visible pose buttons select Auto, Spine, Cover, Stack, or leaning; the page retains ordinary scrolling outside a drag. Keyboard and tap-to-place controls provide alternatives. A completed placement is one undoable shelf change, while cancellation preserves the original shelf. Public and compact shelves remain read-only.
+
+`lib/shelf-actions.ts` reconnects a pile when an item is set aside or removed and remaps supporting item IDs when an arrangement is copied. The import and state validators reject invalid coordinates, cross-row or missing supports, and support cycles. Public snapshots explicitly allowlist the placement data. Reduced-motion preferences disable settling animation. This is constrained placement with transitions, not a general physics engine or a physical-fit guarantee.
 
 ## Application layers
 
