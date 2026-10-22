@@ -26,6 +26,41 @@ function strings(value: unknown, limit = 20, length = 200): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.slice(0, 100).map(item => text(item, length)).filter(Boolean))].slice(0, limit);
 }
+/** Catalog descriptions are displayed as text, never interpreted as HTML. Keep
+ * their prose and paragraph breaks while removing common source formatting. */
+function synopsis(value: unknown): string {
+  const entities: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—', hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”' };
+  let result = text(value, 20000).replace(/\r\n?/g, '\n')
+    .replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
+      if (!name.startsWith('#')) return entities[name.toLowerCase()] ?? entity;
+      const code = name[1].toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : Number(name.slice(1));
+      return code >= 32 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : '';
+    })
+    .replace(/<!--[^]*?-->/g, '')
+    .replace(/<(script|style)\b[^>]*>[^]*?<\/\1\s*>/gi, '')
+    .replace(/<\/?(?:p|div|section|article|h[1-6]|li|blockquote|pre)\b[^>]*>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?[a-z][^>]*>/gi, '')
+    .replace(/^[ \t]{0,3}\[[^\]\n]+\]:[^\n]*(?:\n|$)/gm, '')
+    .replace(/!?\[([^\]\n]+)\](?:\((?:[^()\n]|\([^()\n]*\))*\)|\[[^\]\n]*\])/g, '$1')
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]{0,3}(?:>[ \t]*)+/gm, '')
+    .replace(/`([^`\n]+)`/g, '$1');
+  // A second pass handles emphasis nested inside a bold sentence. Boundaries
+  // preserve ordinary underscores within words and spaced multiplication signs.
+  for (let pass = 0; pass < 2; pass++) {
+    result = result.replace(/(?<![\p{L}\p{N}])(?:\*{1,3}(?=\S)([^*]*[^\s*])\*{1,3}|_{1,3}(?=\S)([^_]*[^\s_])_{1,3})(?![\p{L}\p{N}])/gu, (_, stars: string | undefined, underscores: string | undefined) => stars ?? underscores ?? '');
+  }
+  return result.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, 10000);
+}
+function subjects(value: unknown): string[] {
+  const labels = strings(value, 100, 100).map(subject => subject.replace(/^(?:form|genre):\s*/i, '').trim());
+  return [...new Set(labels.filter(subject =>
+    Boolean(subject) && !/^(?:nyt:|https?:\/\/|urn:|isbn:|lcsh:|fast:)/i.test(subject) &&
+    !/^[a-z][\w:-]*=\S+$/i.test(subject) &&
+    !/^(?:accessible_book|protected_daisy|in_library|printdisabled|internetarchivebooks)$/i.test(subject)
+  ))].slice(0, 20);
+}
 function positiveInteger(value: unknown, maximum = 100000): number | undefined {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value <= maximum ? value : undefined;
 }
@@ -171,9 +206,9 @@ export async function lookupCatalogWork(value: string): Promise<CatalogWork | nu
   const firstPublished = text(work.first_publish_date, 100) || (positiveInteger(summary.first_publish_year, 9999) ? String(summary.first_publish_year) : '');
   return {
     id: workId, source: 'openlibrary', title: text(work.title), author: text(authors.join(', ')) || 'Unknown author', authors,
-    description: text(typeof work.description === 'string' ? work.description : record(work.description).value, 10000),
+    description: synopsis(typeof work.description === 'string' ? work.description : record(work.description).value),
     coverUrl: firstCover(work.covers, 'L') || coverUrl(summary.cover_i, 'L'),
-    ...(firstPublished ? { firstPublished } : {}), subjects: strings(work.subjects, 20, 100),
+    ...(firstPublished ? { firstPublished } : {}), subjects: subjects(work.subjects),
     sourceUrl: `${ORIGIN}/works/${workId}`,
   };
 }

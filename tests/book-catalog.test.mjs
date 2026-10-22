@@ -60,7 +60,11 @@ test('catalog identities distinguish works, chosen editions and explicit communi
 
 test('work pages preserve edition identity, paginate raw records and reuse public cached requests', async t => {
   const requests = upstream(t, url => {
-    if (url.pathname === '/works/OL45804W.json') return { key: '/works/OL45804W', title: 'Fantastic Mr Fox', description: { value: 'A catalog description.' }, covers: [-1, 123], subjects: ['Foxes', 'Foxes', 'Fiction'], isbn_13: ['9780980200447'], number_of_pages: 500 };
+    if (url.pathname === '/works/OL45804W.json') return {
+      key: '/works/OL45804W', title: 'Fantastic Mr Fox',
+      description: { value: '**A new novel from the author of *another story*.**\n\nA reader explores [an endless house](https://example.invalid/house) with <em>statues</em> &amp; tides.<br>There is more to discover.\n\n<script>doNotShow()</script>_A secret waits._' },
+      covers: [-1, 123], subjects: ['Foxes', 'nyt:combined-print-and-e-book-fiction=2020-10-04', 'Foxes', 'Fiction', 'Art: History', 'form:novel', 'genre:fantasy', 'novel', 'accessible_book', 'collection:reading-list=2020'], isbn_13: ['9780980200447'], number_of_pages: 500,
+    };
     if (url.pathname === '/search.json') return { docs: [{ key: '/works/OL45804W', author_name: ['Roald Dahl'], first_publish_year: 1970 }] };
     assert.equal(url.searchParams.get('limit'), '24');
     const offset = Number(url.searchParams.get('offset'));
@@ -80,7 +84,8 @@ test('work pages preserve edition identity, paginate raw records and reuse publi
   assert.equal(book.editions[0].isbn, '9780140328721'); assert.equal(book.editions[0].pages, 96);
   assert.equal(book.editions.length, 1); assert.equal(book.nextEditionsOffset, 3);
   assert.equal(JSON.stringify(book).includes('NEVER_INCLUDE'), false);
-  assert.deepEqual(book.subjects, ['Foxes', 'Fiction']);
+  assert.equal(book.description, 'A new novel from the author of another story.\n\nA reader explores an endless house with statues & tides.\nThere is more to discover.\n\nA secret waits.');
+  assert.deepEqual(book.subjects, ['Foxes', 'Fiction', 'Art: History', 'novel', 'fantasy']);
   const second = await catalog.lookupCatalogBook('OL45804W', 3);
   assert.equal(second.editions[0].editionId, 'OL3M'); assert.equal(second.nextEditionsOffset, null);
   assert.equal(requests.length, 4);

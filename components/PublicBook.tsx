@@ -232,7 +232,7 @@ function BookPage({ id, accountId }: Props) {
 
   const sourceUrl = book?.sourceUrl ? safeExternalUrl(book.sourceUrl) : null;
   return <div className={styles.page}>
-    <header className={styles.header}><a href="/" className={styles.brand} aria-label="Cybershelf home"><BrandWordmark/></a><nav aria-label="Public navigation"><a href="/books">Browse books</a><a href="/" className={styles.libraryLink}><Library size={15}/>Your library<ArrowUpRight size={14}/></a></nav></header>
+    <header className={styles.header}><a href="/" className={styles.brand} aria-label="Cybershelf home"><BrandWordmark/></a><nav aria-label="Public navigation"><a href="/books">Browse books</a><a href="/?view=library" className={styles.libraryLink}><Library size={15}/>Your library<ArrowUpRight size={14}/></a></nav></header>
     <main className={styles.main}>
       <a href="/books" className={styles.back}><ArrowLeft size={14}/>Books, waiting to be found</a>
       {loading ? <section className={styles.pageState} aria-busy="true" role="status"><LoaderCircle size={29} className="spin"/><h1>Opening the cover…</h1><p>A story and the readers around it.</p></section> : error || !book ? <section className={styles.pageState}><BookOpen size={34} strokeWidth={1.2}/><h1>A moment between pages.</h1><p role="alert">{error || 'This book is unavailable just now.'}</p><button type="button" className="button primary" onClick={() => void loadBook()}><RefreshCw size={14}/>Try again</button></section> : <>
@@ -264,7 +264,7 @@ function BookPage({ id, accountId }: Props) {
         </section>
 
         {addNotice && <p className={styles.notice} role="status"><Check size={15}/>{addNotice}</p>}
-        {(addError || libraryProblem) && <div className={styles.libraryError} role="alert"><div><strong>Your library needs a moment.</strong><p>{addError || library.error}</p></div><div>{accountId && canEditLibrary && addError ? <button type="button" className="button secondary small" disabled={!!adding} onClick={() => void retryLibrarySave()}>{adding === 'retry' ? <LoaderCircle className="spin" size={13}/> : <RefreshCw size={13}/>}Retry saving</button> : !library.ready && !library.accountChanged ? <button type="button" className="button secondary small" onClick={() => void library.reload()}><RefreshCw size={13}/>Try loading again</button> : null}<a href="/" className="text-button">Open Library<ArrowUpRight size={12}/></a></div></div>}
+        {(addError || libraryProblem) && <div className={styles.libraryError} role="alert"><div><strong>Your library needs a moment.</strong><p>{addError || library.error}</p></div><div>{accountId && canEditLibrary && addError ? <button type="button" className="button secondary small" disabled={!!adding} onClick={() => void retryLibrarySave()}>{adding === 'retry' ? <LoaderCircle className="spin" size={13}/> : <RefreshCw size={13}/>}Retry saving</button> : !library.ready && !library.accountChanged ? <button type="button" className="button secondary small" onClick={() => void library.reload()}><RefreshCw size={13}/>Try loading again</button> : null}<a href="/?view=library" className="text-button">Open your library<ArrowUpRight size={12}/></a></div></div>}
 
         <div className={styles.below}>
           <section className={styles.editions} id="editions" aria-labelledby="editions-title">
@@ -307,7 +307,7 @@ function BookPage({ id, accountId }: Props) {
               {communityError && <div className={styles.inlineError} role="alert"><p>{communityError}</p><button type="button" className="text-button" onClick={() => { void loadMine(); void loadStats(); }} disabled={!!communityBusy}><RefreshCw size={12}/>Refresh contributions</button></div>}
               {communityNotice && <p className={styles.communityNotice} role="status"><Check size={13}/>{communityNotice}</p>}
             </> : null}
-            <div className={styles.readingInvitation}><BookOpen size={19} strokeWidth={1.5}/><div><h3>Company, at your own pace.</h3><p>Your circle’s shared thoughts meet you at your bookmark in Reading together.</p>{readTogetherUrl ? <a href={readTogetherUrl}>Open this book with your circle<ArrowUpRight size={12}/></a> : <a href="/">Make a home for your reading<ArrowUpRight size={12}/></a>}</div></div>
+            <div className={styles.readingInvitation}><BookOpen size={19} strokeWidth={1.5}/><div><h3>Company, at your own pace.</h3><p>Your circle’s shared thoughts meet you at your bookmark in Reading together.</p>{readTogetherUrl ? <a href={readTogetherUrl}>Open this book with your circle<ArrowUpRight size={12}/></a> : <a href="/?view=library">Make a home for your reading<ArrowUpRight size={12}/></a>}</div></div>
           </aside>
         </div>
       </>}
