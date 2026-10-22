@@ -1,84 +1,131 @@
-# Hosting cybershelf
+# Deploying cybershelf to Cloudflare
 
-The repository contains the application, server routes, schema, and source-level hosting configuration. The current release is integrated with ChatGPT Sites. An independent deployment needs additional authentication and deployment configuration; it is not a one-click self-hosting package yet.
+This release runs independently in your Cloudflare account. GitHub stores the source; Cloudflare Workers runs the application, D1 stores accounts and libraries, and private R2 stores uploaded files. GitHub Pages cannot run the authenticated server APIs.
 
-## Current runtime
+## Configuration already in this repository
 
-- Vinext renders the React application and server routes.
-- A Cloudflare Worker runs the server.
-- D1 holds private catalog state, uploaded-file metadata, and publication snapshots.
-- R2 holds uploaded originals and images.
-- Sites supplies trusted request identity, sign-in/sign-out routing, the deployment audience, and provisioned bindings.
+The root `wrangler.jsonc` contains:
 
-GitHub can host the source and collaboration workflow. GitHub Pages alone cannot run this release's authenticated APIs, database writes, or private file handlers. Keep source hosting and application hosting as separate choices.
+| Setting | Value |
+| --- | --- |
+| Worker name | `cybershelf` |
+| D1 database | `cybershelf-db` |
+| D1 database ID | `1aeda0cc-2045-471d-842f-b0423e43b848` |
+| D1 binding | `DB` |
+| R2 bucket | `cybershelf-files` |
+| R2 binding | `BUCKET` |
+| Application origin | `https://cybershelf.io` |
+| Custom domain | `cybershelf.io` |
 
-## Updating the existing Sites deployment
+These resources must belong to the account used for deployment. The database ID is a normal resource identifier, not an API key. Keep the bucket private; do not enable public R2 access for original books. The Worker handles authenticated downloads and the limited image access needed by public shelf snapshots.
 
-Use the Sites workflow from the repository checkout. Preserve `.openai/hosting.json`, its existing `project_id`, the Worker integration, and logical `DB`/`BUCKET` bindings. Use the project's maintained install/build helpers, generate migrations before building, and publish the verified matching source version and artifact.
+If you fork the project, create your own database and bucket and replace these values, including the domain. Do not reuse the maintainer's resources or the retained development Site identity.
 
-The hosting manifest contains deployment identity and logical binding names, not production database IDs or credentials. Do not replace it with private resource identifiers merely to run local development. Do not commit runtime credentials, `.dev.vars`, or `.env` files.
+## 1. Connect GitHub to Workers Builds
 
-New deployments or forks need their own registered identity and storage. Reusing the existing Site ID does not create an independent fork and should not be used to publish someone else's deployment.
+In the [Cloudflare dashboard](https://dash.cloudflare.com/), open **Workers & Pages → Create application → Connect GitHub**, select `ahmidii/cybershelf`, and use:
 
-## Local development
+| Build setting | Value |
+| --- | --- |
+| Worker/project name | `cybershelf` |
+| Production branch | `main` |
+| Root directory | Repository root (`/`) |
+| Build command | `pnpm run build` |
+| Deploy command | `pnpm run deploy` |
+| Build variable `NODE_VERSION` | `24` |
+| Build variable `PNPM_VERSION` | `11.25.0` |
 
-Start from the [README setup](../README.md#run-locally). A clean clone has no checkout-local execution-profile file and uses the portable profile. Install with the pinned package manager and its committed lockfile. The tracked scripts select the appropriate framework behavior; the managed Linux profile additionally relies on the Sites workspace tools.
+Cloudflare installs dependencies before the build. The committed package-manager version and lockfile should be used. An existing Worker can connect under **Settings → Builds → Connect** instead of creating another Worker.
 
-Build once to emit `dist/server/wrangler.json`, then apply each pending SQL migration to the local D1 database. The persistence directory is `.wrangler/state`; do not add its internal version suffix yourself. Use one local preview owner at a time.
+The current configuration points at the production database. Enable automatic deployment for `main`; do not configure branch previews against these same production bindings. A separate preview environment needs its own database, bucket, secret, origin, and deployment configuration.
 
-The portable development integration can simulate a test user on loopback requests. That mock sign-in is for local development only. Managed previews do not add it, and production builds must not depend on it. Do not expose a development preview as a public service.
+The build writes `dist/server/wrangler.json` and the client assets. The deploy command first applies pending SQL migrations from `drizzle/`, then deploys that built configuration. A failed migration stops deployment. Wrangler tracks successful migrations, so retrying a failed build does not blindly rerun all SQL.
 
-## Independent deployment checklist
+Reference: [Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/) and [build image settings](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/).
 
-### 1. Supply real authentication
+## 2. Give the build token permission to apply migrations
 
-Replace or adapt `app/chatgpt-auth.ts` and the sign-in links. The application needs a verified, stable user ID, an optional display name, and account-session handling. Choose a normal authenticated session implementation for the target host, or place the Worker behind a trusted identity proxy.
+Cloudflare's automatically generated build token does not currently include D1 write permission. The deploy script needs it to create and update the application's tables.
 
-If using a proxy, strip all incoming `oai-authenticated-*` headers before authenticating the request, then inject verified identity server-side. Block direct access to the origin so a visitor cannot bypass that proxy. A frontend-supplied user ID, a query parameter, or a freely writable request header is not authentication.
+1. In **cybershelf → Settings → Builds → API token**, identify the selected token.
+2. Open **My Profile → API Tokens**, edit that token, and add **Account → D1 → Edit** for the account containing `cybershelf-db`.
+3. Keep its existing Worker, R2, account, and zone permissions. Save the token and retry the deployment.
 
-Sites owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, and `/callback` in its deployment. Those routes do not become a working OAuth integration when the source is deployed elsewhere. Replace the route/link behavior as part of the adapter. Keep private APIs rejecting unauthenticated requests and preserve account-owner checks for every original-file operation.
+If you use a separately created token, select it in the Worker's build settings with the normal Worker deployment permissions plus D1 Edit. You do not need to put the token in GitHub source or share it in chat.
 
-User IDs are deployment-specific ownership keys. Moving raw D1 records to another identity provider requires a verified owner mapping. JSON/catalog import is an alternative for an individual reader, but old private file references must be replaced with that account's new uploads.
+Reference: [Workers Builds API-token permissions](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/), and [Worker authorization](https://developers.cloudflare.com/workers/authorization/).
 
-### 2. Provision database and object storage
+## 3. Add the authentication secret
 
-Create a D1 database and private R2 bucket for the independent deployment. Bind them as `DB` and `BUCKET`, or update the relevant source/environment typings together if using different names. Keep the R2 bucket private and route file access through the application.
+Open **Workers & Pages → cybershelf → Settings → Variables and Secrets → Add**:
 
-Configure the target's Worker deployment settings and compatibility requirements using the generated build and the retained `worker/index.ts` entry point. The repository's Sites-generated configuration is not a ready-made configuration for arbitrary external accounts. Production resource IDs belong in the target deployment configuration, and secrets belong in that host's secret store.
+| Field | Value |
+| --- | --- |
+| Type | **Secret** |
+| Name | `BETTER_AUTH_SECRET` |
+| Value | A unique cryptographically random value, at least 32 characters |
 
-Apply committed schema migrations in order. Track which migrations have run, including after a partially failed deployment. Back up the database before changing an existing deployment's schema. Never reinitialize storage as a workaround for a migration error.
+Generate it locally with your password manager, or with Node:
 
-### 3. Verify the account boundary
+```sh
+node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"
+```
 
-Before opening the independent deployment to readers, verify the concrete behavior with your authentication adapter:
+Store that result privately and paste it into Cloudflare. Choose **Deploy** when saving the secret. It is a Worker runtime secret, not a public `VITE_` variable and not merely a build environment variable. Keep the same value across future deployments; changing it invalidates existing sessions.
 
-- A signed-out request cannot read or write a library or retrieve an original.
-- A second account cannot retrieve, attach, delete, or publish the first account's private assets.
-- A publication contains only its allowlisted fields and permitted image objects.
-- A book original cannot be served through a public image path.
-- Revoking a publication removes its snapshot and image access.
-- A stale save returns a conflict instead of replacing a newer state.
+`APP_ORIGIN=https://cybershelf.io` is already in the source configuration. Wrangler preserves previously configured secrets on deployment. Without a valid secret, the guest app can load but account creation and sign-in remain unavailable.
 
-The local integration tests cover these application expectations. They deliberately accept only a loopback target. For an independent deployed environment, verify its real authentication mechanism separately; manually adding identity headers is not a production sign-in test.
+Reference: [Cloudflare secrets](https://developers.cloudflare.com/workers/configuration/secrets/) and [Wrangler deployment options](https://developers.cloudflare.com/workers/wrangler/commands/workers/).
 
-### 4. Configure audience, limits, and operations
+## 4. Confirm the custom domain
 
-If public shelf links should be readable by anyone, the outer hosting audience must allow anonymous requests to public pages and endpoints. The application still requires authentication for private data and mutations. Setting the entire host private also restricts shared shelf URLs.
+The committed custom-domain route tells deployment to connect `cybershelf.io`. Cloudflare manages the DNS record and certificate when the zone is active in the same account and there is no conflicting record.
 
-Review the implemented first-release limits in the README and source before changing them. File storage, Worker memory, database payloads, and browser backup memory impose different constraints. A larger per-file limit is not sufficient to support larger libraries safely.
+After a successful deploy, check **cybershelf → Settings → Domains & Routes** for `cybershelf.io`. If Cloudflare reports a conflicting DNS record, inspect the exact record it names and resolve that conflict before retrying. Do not change unrelated mail or DNS records. An existing conflicting CNAME cannot be used for a Worker Custom Domain.
 
-Maintain backups of both D1 and R2 if operating the service. A database-only backup contains object references, not original files. Logs should help diagnose failures without dumping private catalog content or credentials. Choose a retention/deletion policy before inviting a wider community; uploaded objects and catalog entries are separate records.
+Use **https://cybershelf.io** for account tests. Authentication deliberately trusts this exact configured origin. A temporary `workers.dev` URL is not an alternative sign-in origin. To change the primary domain later, update `APP_ORIGIN` and the custom-domain route together, then rebuild and deploy.
 
-## Moving a personal collection
+`www.cybershelf.io` is not configured. If you want it, add a separate redirect to the canonical `https://cybershelf.io` address rather than treating the two hosts as interchangeable sessions.
 
-On the original deployment, export the catalog JSON and a complete ZIP when the collection fits the 100 MB archive limit. For larger collections, export JSON and download originals individually. The ZIP includes an asset manifest and unchanged originals.
+Reference: [Worker Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
 
-Restoring JSON to the same account reconnects uploads that still exist there. Restoring a collection to another account or deployment currently requires re-uploading the files and replacing old private asset references before saving the restored catalog. Unpacking and restoring a ZIP as one operation is not implemented. Published snapshot identities are intentionally removed from imported JSON; share the restored shelves afresh when ready.
+## 5. Verify the deployed application
 
-Retailer purchases and external cover URLs are not copied into the archive. Their catalog links are preserved, and access remains controlled by their original service or owner.
+Open the custom domain, create an account, add a book and a shelf, and reload to confirm they persist. Upload a small EPUB/PDF and retrieve it through **Grab this book**. Sign out and sign back in. Publish a shelf and open its share link in a signed-out window; that link should show the chosen shelf without private notes, source links, or book originals.
 
-## Custom domain
+If a private API reports a database error, check that both committed migrations completed successfully. If authentication is unavailable, check the runtime secret and exact origin. If requests fail with a Worker CPU-limit error, inspect Cloudflare's invocation metrics and plan limits. The Free plan has a small per-request CPU allowance; a local test does not establish that a complete production auth request fits it. The maintained authentication dependency uses native scrypt on Workers, without reducing password-hash strength to meet a plan limit.
 
-`cybershelf.io` is the project's intended custom domain. The source does not itself register, verify, or activate it. Add the domain through the selected host and apply the exact DNS records returned by that host. Confirm certificate issuance, HTTPS routing, the canonical hostname, sign-in return paths, and existing share URLs before advertising the domain as live.
+Reference: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 
-Do not invent a CNAME target or change unrelated DNS records. Domain configuration and GitHub repository selection are deployment tasks outside the application source.
+## Account behavior and current limits
+
+Accounts use Better Auth, signed HTTP-only cookies, database-backed sessions, and database-backed authentication rate limits. Sign-out is a POST. Raw identity headers cannot authenticate a request. A separate account precondition prevents an old tab from saving into another account after a session switch.
+
+This release supports email/password signup and sign-in without an external email service. **Email verification and forgotten-password recovery are not configured.** Addresses remain unverified and automatic account linking is disabled. The signup screen explains the recovery limitation. Add an actual mail provider and tested recovery flow before promising those features.
+
+The application limits in the README still apply. Keep backups of both D1 and R2: a database backup has file references, not the uploaded bytes. Password/session records are sensitive and should not be included in public debugging output.
+
+## Local development and CLI deployment
+
+Follow the [README](../README.md#run-locally) for local setup. Development uses `.wrangler/state` and the ignored `.dev.vars` file; it never needs a production API token. Normal sign-up and sign-in also work locally.
+
+For a CLI deployment from your own machine:
+
+```sh
+pnpm exec wrangler login
+pnpm run build
+pnpm run deploy -- --dry-run
+pnpm run deploy
+```
+
+The final command applies remote migrations and publishes to the account you authenticated. Review the resource identifiers before using it in a fork. Add the runtime secret through the dashboard or `pnpm exec wrangler secret put BETTER_AUTH_SECRET --config wrangler.jsonc`.
+
+Schema updates belong in new, committed migrations. Do not edit a migration that has already run in production or reinitialize storage after an error. If a migration succeeds but the Worker upload fails, retry the deployment; completed migrations remain tracked.
+
+## Moving an existing collection
+
+Export JSON and original files from the original account first. Restoring JSON to the same deployment/account reconnects uploads that still exist there. Moving to a different deployment or account currently requires re-uploading originals and replacing old private asset references. A ZIP export contains the unchanged originals and an asset manifest, but one-step ZIP restore is not implemented.
+
+Old Sites account IDs and new standalone account IDs are different ownership keys. Do not copy records between identities without an explicit verified mapping. Published snapshots should be created again from the restored library.
+
+The original `.openai/hosting.json` is retained for development history. The standalone `deploy` command does not publish to that Site or depend on its authentication boundary.

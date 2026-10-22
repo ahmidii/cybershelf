@@ -1,11 +1,23 @@
-import { getChatGPTUser } from '../../app/chatgpt-auth';
+import { getCurrentUser } from '../../app/auth';
+import { ACCOUNT_ID_HEADER } from '../auth-contract';
 
-export class HttpError extends Error { constructor(public status:number,message:string){super(message);} }
+export class HttpError extends Error { constructor(public status:number,message:string,public code?:string){super(message);} }
 export function json(data:unknown,status=200,headers:Record<string,string>={}) {
   return Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});
 }
-export async function authenticated() {
-  const user=await getChatGPTUser(); if(!user) throw new HttpError(401,'Sign in to save your library.'); return user;
+export async function authenticated(request?:Request) {
+  const user=await getCurrentUser();
+  if(!user)throw new HttpError(401,'Sign in to save your library.');
+  if(request){
+    const expectedAccount=request.headers.get(ACCOUNT_ID_HEADER);
+    const isMutation=!['GET','HEAD','OPTIONS'].includes(request.method.toUpperCase());
+    // This is a stale-tab precondition, never an authentication credential.
+    // Only the verified session above determines whose records may be read.
+    if((isMutation||expectedAccount!==null)&&expectedAccount!==user.userId){
+      throw new HttpError(409,'Your account changed. Export this draft if needed, then reload to open the current account.','ACCOUNT_CHANGED');
+    }
+  }
+  return user;
 }
 export function sameOrigin(request:Request) {
   const origin=request.headers.get('origin');
@@ -42,7 +54,7 @@ export async function readJson(request:Request,max=2*1024*1024):Promise<unknown>
 }
 export async function handled(action:()=>Promise<Response>):Promise<Response> {
   try{return await action();}catch(error){
-    if(error instanceof HttpError)return json({error:error.message},error.status);
+    if(error instanceof HttpError)return json({error:error.message,...(error.code?{code:error.code}:{})},error.status);
     console.error('cybershelf API failure', error instanceof Error?error.message:'Unknown error');
     return json({error:'Something went wrong. Please try again.'},500);
   }

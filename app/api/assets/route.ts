@@ -3,12 +3,12 @@ import { bucket, database, type AssetRow } from '@/lib/server/storage';
 import { detectedFileType } from '@/lib/server/file-types';
 
 export const dynamic='force-dynamic';
-export async function GET(){return handled(async()=>{
-  const user=await authenticated();const result=await database().prepare('SELECT * FROM assets WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1000').bind(user.userId).all<AssetRow>();
+export async function GET(request:Request){return handled(async()=>{
+  const user=await authenticated(request);const result=await database().prepare('SELECT * FROM assets WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1000').bind(user.userId).all<AssetRow>();
   return json({assets:result.results.map(a=>({id:a.id,filename:a.filename,mime:a.mime,size:a.size,url:'/api/assets/'+a.id})),usedBytes:result.results.reduce((total,a)=>total+a.size,0),limitBytes:500*1024*1024});
 });}
 export async function POST(request:Request){return handled(async()=>{
-  sameOrigin(request);const user=await authenticated();
+  sameOrigin(request);const user=await authenticated(request);
   const contentType=request.headers.get('content-type')??'';
   if(!contentType.startsWith('multipart/form-data'))throw new HttpError(415,'Choose a file to upload.');
   const body=boundedStream(request,26*1024*1024);

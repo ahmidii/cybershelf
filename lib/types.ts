@@ -24,7 +24,7 @@ export interface Shelf {
 }
 export interface Profile { name: string; bio: string; }
 export interface AppState { schemaVersion: 1; profile: Profile; books: Book[]; shelves: Shelf[]; }
-export interface StateResponse { state: AppState | null; version: number; user: { name: string }; }
+export interface StateResponse { state: AppState | null; version: number; user: { id: string; name: string }; }
 export interface Asset { id: string; filename: string; mime: string; size: number; url: string; }
 export interface PublicBook { id: string; title: string; author: string; coverUrl: string; color: string; }
 export interface Publication {

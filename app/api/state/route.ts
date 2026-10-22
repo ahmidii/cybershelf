@@ -3,12 +3,12 @@ import { checkAssetReferences, database, getLibrary } from '@/lib/server/storage
 import { saveSchema } from '@/lib/server/validation';
 
 export const dynamic='force-dynamic';
-export async function GET(){return handled(async()=>{
-  const user=await authenticated();const row=await getLibrary(user.userId);
-  return json({state:row?JSON.parse(row.state):null,version:row?.version??0,user:{name:user.fullName??'Reader'}});
+export async function GET(request:Request){return handled(async()=>{
+  const user=await authenticated(request);const row=await getLibrary(user.userId);
+  return json({state:row?JSON.parse(row.state):null,version:row?.version??0,user:{id:user.userId,name:user.fullName??'Reader'}});
 });}
 export async function PUT(request:Request){return handled(async()=>{
-  sameOrigin(request);const user=await authenticated();const parsed=saveSchema.safeParse(await readJson(request));
+  sameOrigin(request);const user=await authenticated(request);const parsed=saveSchema.safeParse(await readJson(request));
   if(!parsed.success)throw new HttpError(400,parsed.error.issues[0]?.message??'Invalid library data.');
   const {state,version}=parsed.data;await checkAssetReferences(state,user.userId);
   const serialized=JSON.stringify(state);if(new TextEncoder().encode(serialized).byteLength>2*1024*1024)throw new HttpError(413,'Your library backup is too large.');

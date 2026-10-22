@@ -15,7 +15,7 @@ export async function GET(request:Request){return handled(async()=>{
   return json({items:rows.map(row=>JSON.parse(row.snapshot)),...(result.results.length>24&&last?{nextCursor:btoa(JSON.stringify([last.updated_at,last.id]))}:{})});
 });}
 export async function POST(request:Request){return handled(async()=>{
-  sameOrigin(request);const user=await authenticated();const body=await readJson(request,4096) as {shelfId?:unknown};
+  sameOrigin(request);const user=await authenticated(request);const body=await readJson(request,4096) as {shelfId?:unknown};
   const parsed=idSchema.safeParse(body?.shelfId);if(!parsed.success)throw new HttpError(400,'Choose a shelf to share.');
   const library=await getLibrary(user.userId);if(!library)throw new HttpError(404,'Save your shelf before sharing it.');
   const state=JSON.parse(library.state) as AppState;const shelf=state.shelves.find(s=>s.id===parsed.data);if(!shelf)throw new HttpError(404,'Shelf not found.');

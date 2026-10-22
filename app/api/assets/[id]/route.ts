@@ -5,14 +5,14 @@ import type { AppState } from '@/lib/types';
 
 export const dynamic='force-dynamic';
 type Context={params:Promise<{id:string}>};
-export async function GET(_request:Request,context:Context){return handled(async()=>{
-  const user=await authenticated();const {id}=await context.params;if(!idSchema.safeParse(id).success)throw new HttpError(404,'File not found.');
+export async function GET(request:Request,context:Context){return handled(async()=>{
+  const user=await authenticated(request);const {id}=await context.params;if(!idSchema.safeParse(id).success)throw new HttpError(404,'File not found.');
   const asset=await getAsset(id,user.userId);if(!asset)throw new HttpError(404,'File not found.');
   const object=await bucket().get(asset.object_key);if(!object)throw new HttpError(404,'File not found.');
   return assetResponse(object,asset);
 });}
 export async function DELETE(request:Request,context:Context){return handled(async()=>{
-  sameOrigin(request);const user=await authenticated();const {id}=await context.params;
+  sameOrigin(request);const user=await authenticated(request);const {id}=await context.params;
   const asset=await getAsset(id,user.userId);if(!asset)throw new HttpError(404,'File not found.');
   const library=await getLibrary(user.userId);
   if(library && referencedAssets(JSON.parse(library.state) as AppState).some(ref=>ref.id===id))throw new HttpError(409,'Remove this file from your library or shelves before deleting it.');

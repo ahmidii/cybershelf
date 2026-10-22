@@ -4,7 +4,7 @@ A place to collect books, arrange personal shelves, and keep a reading life with
 
 cybershelf separates a **Library** from the shelves you make with it. A book can be something you own, borrowed, have read, or simply want to remember. Add it once, then display it on as many themed shelves as you like. The `//` mark is two books leaning together.
 
-This repository contains the first release: a React application, its server API, database migrations, and the Sites hosting integration. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). `cybershelf.io` is the intended custom domain; domain setup is separate from building this source. See [release status](docs/release-status.md) for the current verification and deployment status.
+This repository contains the first release: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
 
 ## What you can do
 
@@ -50,42 +50,34 @@ Limits are currently implemented using powers of 1,024 bytes. Large libraries ca
 
 ## Run locally
 
-Use Node.js 24 for development and the test runner; the application package declares Node.js 22.13 or newer. Install the package manager version pinned in `package.json` and use the committed lockfile. The current checkout uses pnpm:
+Use Node.js 24 and the pnpm version pinned in `package.json` (11.25.0). From a clean clone:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm run build
-```
-
-Use the committed `pnpm-lock.yaml`; do not mix package managers or run simultaneous installers. `install:ci` is maintained for the Sites environment and may use environment-specific setup. A clean external clone defaults to the portable execution profile.
-
-The build generates `dist/server/wrangler.json`. Apply the committed migration to a new local database before using saved libraries:
-
-```sh
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_awesome_zarda.sql
-```
-
-Do not replay an already applied migration. Start the portable development server:
-
-```sh
+pnpm run setup:local
+pnpm run db:migrate:local
 pnpm run dev
 ```
 
-Use the loopback URL printed by the server. The portable development profile includes local-only simulated sign-in; its identity is a development fixture. Production sign-in is supplied by Sites. `pnpm run start` previews the built Worker locally and does not deploy it.
+Open **http://localhost:5173**. The setup command creates an ignored `.dev.vars` file with a random local authentication secret and that exact origin. Create a local account through the normal sign-in screen. Local D1 and R2 use `.wrangler/state`; they do not access the production resources even though the deployment identifiers are in `wrangler.jsonc`. The migration command tracks completed files, so it is safe to repeat after an update.
 
-In a managed ChatGPT Sites workspace, follow the Sites helper workflow for installation, migrations, supervised preview, packaging, and deployment. Keep the existing `project_id` when updating this deployment. The internal preview URL is not a public site URL.
+If you use another hostname or port, update `APP_ORIGIN` in `.dev.vars` to match it exactly. `localhost` and `127.0.0.1` are different origins. Do not commit `.dev.vars`, production secrets, or local databases.
+
+Use the committed lockfile and one installer at a time. A clean clone uses the portable execution profile. The retained `install:ci` and managed-workspace helpers are for the original Sites development environment.
 
 ### Checks
-
-After dependency installation, run the complete checks with:
 
 ```sh
 pnpm run typecheck
 pnpm test
 pnpm run build
+pnpm run test:worker
+pnpm run deploy -- --dry-run
 ```
 
-Regression coverage lives in `tests/import.test.ts`, `tests/arrange.test.ts`, and `lib/server/server.test.mjs`. `lib/server/integration.test.mjs` exercises owner isolation and publication access against a local preview when `CYBERSHELF_TEST_BASE_URL` is set to a loopback origin. It refuses remote targets and creates temporary test data.
+The regression suite covers imports, backups, shelf arrangements, validation, public/private field separation, and authentication boundaries. The Worker integration check runs the built application with disposable local D1/R2 storage and real account/session cookies. It does not use the production database or a Cloudflare API token. A deploy dry run validates the upload without applying remote migrations or publishing.
+
+`pnpm run start --port 5173` previews the built Worker locally. Match `.dev.vars` to the origin you open. The separate `test:integration` command can target an existing local server through `CYBERSHELF_TEST_BASE_URL`; it refuses remote targets and creates temporary test accounts.
 
 ## Backup and restore
 
@@ -97,7 +89,9 @@ This release restores the catalog JSON, not the ZIP as a single operation. For a
 
 The current runtime is Vinext on Cloudflare Workers, with D1 for account records and publication snapshots and R2 for uploaded files. GitHub stores and collaborates on the source; a static GitHub Pages deployment alone cannot run these authenticated APIs.
 
-Self-hosting is possible, but it requires an authentication adapter and Cloudflare resource configuration. The provided ChatGPT auth headers are trustworthy only behind the Sites authentication boundary. **Do not expose a standalone deployment that accepts caller-supplied identity headers.** Read [self-hosting](docs/self-hosting.md) before deploying outside Sites.
+Standalone hosting is configured in `wrangler.jsonc`: Worker `cybershelf`, D1 `cybershelf-db` as `DB`, private R2 `cybershelf-files` as `BUCKET`, and the `cybershelf.io` custom domain. The deploy script applies pending migrations before publishing the built Worker. Follow the [Cloudflare setup guide](docs/self-hosting.md) for the GitHub connection, build-token permission, and required `BETTER_AUTH_SECRET`. Forks must replace the resource identifiers and domain with their own.
+
+Accounts use Better Auth with database-backed sessions and rate limiting. Requests cannot establish identity by supplying legacy hosting headers. This release does not send verification or password-reset emails; readers should keep their passwords in a password manager. Adding recovery requires an email delivery service and an explicit recovery flow.
 
 For changes, read [CONTRIBUTING.md](CONTRIBUTING.md), [architecture](docs/architecture.md), and [CHANGELOG.md](CHANGELOG.md).
 

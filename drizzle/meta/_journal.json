@@ -8,6 +8,13 @@
       "when": 1792569582675,
       "tag": "0000_awesome_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792651723075,
+      "tag": "0001_standalone_auth",
+      "breakpoints": true
     }
   ]
 }

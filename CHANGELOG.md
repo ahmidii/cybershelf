@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.1 — Standalone Cloudflare deployment — 2026-10-22
+
+### Added
+
+- Cloudflare configuration for `cybershelf.io`, the maintainer’s existing D1 database, and private R2 bucket.
+- A deploy command that applies pending database migrations before publishing the built Worker; dry runs do not mutate remote resources.
+- Email/password account creation, sign-in, POST sign-out, signed database-backed sessions, and persistent authentication rate limiting.
+- A dedicated responsive sign-in page and an honest setup state when the authentication secret is missing.
+- Local setup that generates an ignored development secret and uses the same real account flow as production.
+- Authentication regression coverage and disposable Worker integration checks using session cookies.
+
+### Changed
+
+- Private APIs use authenticated account sessions and no longer trust hosting-specific identity headers.
+- Private writes check the expected account as well as library versions to prevent stale tabs saving across an account switch.
+- Deployment documentation now covers Workers Builds, migrations, secret configuration, and the custom domain.
+
+### Account boundary
+
+- No email delivery, email verification, or password-reset flow is configured yet. Account linking is disabled. The sign-up screen states this limitation.
+
 ## 0.1.0 — First edition — 2026-10-21
 
 ### Added
@@ -23,4 +44,4 @@
 - Reviews and journal records remain private. Public pages show the chosen shelf snapshot.
 - Physical shelf planning is visual and does not calculate fit from dimensions.
 - JSON restores catalog data; ZIP files must currently be unpacked and original uploads reconnected manually when moving to another account or deployment.
-- Independent hosting needs an authentication adapter and deployment configuration. The custom domain and public GitHub destination are configured separately from the source release.
+- The original 0.1.0 required a separate authentication adapter for independent hosting; 0.1.1 supplies that adapter and Cloudflare deployment configuration.

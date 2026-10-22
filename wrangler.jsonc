@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cybershelf",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    {
+      "pattern": "cybershelf.io",
+      "custom_domain": true
+    }
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://cybershelf.io"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cybershelf-db",
+      "database_id": "1aeda0cc-2045-471d-842f-b0423e43b848",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "cybershelf-files"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import ShelfCanvas from './ShelfCanvas';
 import { emptyState, newBook, uid, type AppState, type Book, type Publication, type PublicBook, type Shelf, type ShelfItem, type StateResponse } from '../lib/types';
 import styles from './PublicShelf.module.css';
+import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 
 class SignInRequired extends Error {}
 const sameBook=(book:Book,other:PublicBook)=>book.title.trim().toLocaleLowerCase()===other.title.trim().toLocaleLowerCase()&&book.author.trim().toLocaleLowerCase()===other.author.trim().toLocaleLowerCase();
@@ -17,16 +18,22 @@ function PublicCover({book,detail=false}:{book:PublicBook;detail?:boolean}) {
 }
 
 async function updateLibrary(change:(state:AppState)=>{state:AppState;message:string}):Promise<string> {
+  let expectedAccount:string|undefined;
   for(let attempt=0;attempt<2;attempt++) {
-    const response=await fetch('/api/state',{cache:'no-store'});
+    const response=await fetch('/api/state',{cache:'no-store',headers:expectedAccount?{[ACCOUNT_ID_HEADER]:expectedAccount}:undefined});
     if(response.status===401)throw new SignInRequired('Sign in to save this to your library.');
-    if(!response.ok)throw new Error('Your library could not be opened. Please try again.');
+    if(!response.ok){const error=await response.json().catch(()=>({})) as {error?:string};throw new Error(error.error||'Your library could not be opened. Please try again.');}
     const current=await response.json() as StateResponse;
+    if(!current.user?.id||(expectedAccount&&current.user.id!==expectedAccount))throw new Error('Your account changed. Reload the page before saving this to your library.');
+    expectedAccount=current.user.id;
     const next=change(current.state||emptyState());
-    const saved=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:next.state,version:current.version})});
+    const saved=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json',[ACCOUNT_ID_HEADER]:expectedAccount},body:JSON.stringify({state:next.state,version:current.version})});
     if(saved.status===401)throw new SignInRequired('Sign in to save this to your library.');
-    if(saved.status===409&&attempt===0)continue;
-    if(!saved.ok){const error=await saved.json().catch(()=>({})) as {error?:string};throw new Error(error.error||'Your library could not be saved. Please try again.');}
+    if(!saved.ok){
+      const error=await saved.json().catch(()=>({})) as {error?:string;code?:string};
+      if(saved.status===409&&error.code!=='ACCOUNT_CHANGED'&&attempt===0)continue;
+      throw new Error(error.error||'Your library could not be saved. Please try again.');
+    }
     return next.message;
   }
   throw new Error('Your library changed in another tab. Please try again.');
@@ -42,7 +49,7 @@ export default function PublicShelf({id}:{id:string}) {
   const [needsSignIn,setNeedsSignIn]=useState(false);
   const [copiedShelf,setCopiedShelf]=useState(false);
   const dialog=useRef<HTMLDialogElement>(null);
-  const signInUrl='/signin-with-chatgpt?return_to='+encodeURIComponent('/s/'+id);
+  const signInUrl=signInPath('/s/'+id);
   function openBook(book:PublicBook|null) {setNotice('');setNeedsSignIn(false);setSelected(book);}
 
   useEffect(()=>{
@@ -122,7 +129,7 @@ export default function PublicShelf({id}:{id:string}) {
         </section>
         {(notice||needsSignIn)?<section className={styles.feedback} aria-live="polite">
           {notice?<p role="status">{notice}</p>:null}
-          {needsSignIn?<><p>Sign in to add books and save your own shelves.</p><a href={signInUrl} target="_top" className={styles.primary}>Continue with ChatGPT <span aria-hidden="true">↗</span></a></>:null}
+          {needsSignIn?<><p>Sign in to add books and save your own shelves.</p><a href={signInUrl} className={styles.primary}>Sign in to cybershelf <span aria-hidden="true">↗</span></a></>:null}
         </section>:null}
         {publication.books.length?<section className={styles.bookList}>
           <div className={styles.sectionHeading}><h2>Between these covers</h2><span>{publication.books.length.toString().padStart(2,'0')} TITLES</span></div>
@@ -140,7 +147,7 @@ export default function PublicShelf({id}:{id:string}) {
         <p className={styles.detailNote}>Save this title to your library, then find a place for it on your own shelf.</p>
         <button type="button" className={styles.primary} onClick={()=>saveBook(selected)} disabled={busy}>{busy?'Saving…':'+ Add to my library'}</button>
         {notice?<p className={styles.dialogNotice} role="status">{notice}</p>:null}
-        {needsSignIn?<div className={styles.dialogNotice}><p>Sign in to save this book.</p><a href={signInUrl} target="_top">Continue with ChatGPT ↗</a></div>:null}
+        {needsSignIn?<div className={styles.dialogNotice}><p>Sign in to save this book.</p><a href={signInUrl}>Sign in to cybershelf ↗</a></div>:null}
       </div>:null}
     </dialog>
   </div>;

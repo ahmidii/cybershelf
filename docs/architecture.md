@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the first release as implemented. The app runs on Vinext/React with a Cloudflare Worker, a D1 database, and an R2 bucket. Sites supplies the deployed authentication and hosting boundary.
+This document describes the first release as implemented. The app runs on Vinext/React with a Cloudflare Worker, a D1 database, and an R2 bucket. Better Auth supplies email/password authentication and database-backed sessions on the standalone Cloudflare deployment.
 
 ## Product model
 
@@ -38,13 +38,15 @@ The maintained starter includes connector plumbing, but the first release does n
 
 ## Persistence and saves
 
-The database schema currently has three tables:
+The application data uses three tables:
 
 | Table | Stored data |
 | --- | --- |
 | `libraries` | One validated JSON state per stable owner ID, a version counter, and update time. |
 | `assets` | Private asset owner, type, object key, filename, MIME type, size, and creation time. |
 | `publications` | Owner/shelf relationship, sanitized snapshot, public image allowlist, and timestamps. |
+
+Better Auth additionally owns `auth_user`, `auth_session`, `auth_account`, `auth_verification`, and `auth_rate_limit`. Password hashes and session tokens stay server-side. The verification table is reserved for the maintained authentication schema; no email delivery or account-recovery flow is configured in this release.
 
 The compact state record keeps this initial application simple and makes catalog backup straightforward. It has a 2 MB payload ceiling, 2,000-book ceiling, and 100-shelf ceiling. A larger-scale version may normalize records, but that migration must preserve IDs, exports, placements, and conflict behavior.
 
@@ -56,6 +58,7 @@ Anonymous edits use a clearly labelled browser-local draft. They are not synchro
 
 | Endpoint | Access and purpose |
 | --- | --- |
+| `GET /api/auth/*`, `POST /api/auth/*` | Better Auth session, signup, sign-in, and sign-out endpoints. |
 | `GET /api/state` | Signed-in owner: current state, version, and initial display name. |
 | `PUT /api/state` | Signed-in owner: validated versioned save and removal of publications for deleted shelves. |
 | `GET /api/assets` | Signed-in owner: uploaded-asset inventory and storage usage. |
@@ -69,7 +72,7 @@ Anonymous edits use a clearly labelled browser-local draft. They are not synchro
 | `DELETE /api/publications/[id]` | Publication owner only: revoke the snapshot. |
 | `GET /api/publications/[id]/assets/[assetId]` | Read an image explicitly allowlisted by an existing publication. |
 
-Application-public endpoints remain subject to any outer Sites audience restriction. They become publicly reachable when the deployment audience permits anonymous visits.
+Public shelf endpoints allow anonymous visitors. Private data and application mutations require a valid account session. An optional outer access restriction would also restrict share links.
 
 Write handlers validate request origin where supplied, require identity, and validate content. The server verifies that referenced private assets belong to the current account and have the required kind. Client-side parsing improves feedback but is not an authorization boundary.
 
@@ -101,11 +104,17 @@ The complete backup uses ordinary, uncompressed ZIP entries so the file bytes re
 
 ## Identity and hosting
 
-[`app/chatgpt-auth.ts`](../app/chatgpt-auth.ts) reads identity supplied by Sites. The stable user ID is the ownership key. Public snapshots use the chosen profile display name; they do not fall back to publishing an email address.
+[`app/auth.ts`](../app/auth.ts) resolves a signed cookie through Better Auth and D1. The stable account ID is the ownership key. Cookies are HTTP-only, SameSite=Lax, and Secure on HTTPS. Sessions expire after 30 days and are checked against D1; the session cookie cache is disabled. Sign-out is a POST and revokes the session. The application never accepts `oai-authenticated-*` headers as proof of identity.
 
-The authentication headers are valid only behind the trusted Sites dispatch layer. An independently reachable Worker must not accept arbitrary caller-supplied versions of those headers. An external host must implement authenticated sessions or a trusted identity proxy that strips incoming identity headers and injects verified values. See [self-hosting](self-hosting.md).
+[`lib/server/auth.ts`](../lib/server/auth.ts) configures an explicit `APP_ORIGIN`, a required random `BETTER_AUTH_SECRET`, maintained password hashing, and database-backed rate limits. Cloudflare’s `CF-Connecting-IP` supplies the rate-limit address; forwarding headers chosen by a caller do not establish identity. Accounts have unverified email addresses until an actual verification flow is added. Account linking is disabled. A missing auth configuration disables account sign-in while keeping guest browsing available.
 
-The tracked hosting manifest declares logical bindings `DB` and `BUCKET`. It does not contain production database IDs or bucket credentials. Schema changes are generated and committed migrations; request handlers do not create tables. Local D1/R2 state is separate from deployed state.
+Private mutation requests carry `X-Cybershelf-Account` as an identity precondition. The server compares it with the authenticated session; the header cannot grant access. This prevents an old tab from saving one reader’s library into another reader’s account after a cookie/session change. Optimistic library versions separately prevent concurrent overwrite within the same account.
+
+Public snapshots use the chosen profile display name and do not fall back to publishing an email address. Moving records from another deployment or identity provider requires a verified mapping of old and new owners; raw ownership IDs do not transfer access.
+
+The root `wrangler.jsonc` owns the production Worker name, bindings, canonical origin, and custom domain. Its D1 UUID is a resource identifier, not a credential. The build derives `dist/server/wrangler.json`; deployments use that generated file. `scripts/deploy-cloudflare.mjs` applies only pending D1 migrations before uploading the Worker and stops if a migration fails. Request handlers never create tables. Local and integration-test storage is separate from production.
+
+The retained `.openai/hosting.json` records the original development Site identity. It does not configure authentication for this standalone release and is not the destination of `pnpm run deploy`.
 
 ## External requests and future work
 

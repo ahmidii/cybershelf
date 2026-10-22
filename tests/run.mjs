@@ -30,6 +30,7 @@ try {
     resolve(scratch, 'tests/import.test.mjs'),
     resolve(scratch, 'tests/arrange.test.mjs'),
     resolve(root, 'lib/server/server.test.mjs'),
+    resolve(root, 'lib/server/auth.test.mjs'),
   ], { cwd: root, stdio: 'inherit' });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
