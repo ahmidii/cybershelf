@@ -2,18 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import ShelfCanvas from './ShelfCanvas';
+import BrandMark from './BrandMark';
 import { emptyState, newBook, uid, type AppState, type Book, type Publication, type PublicBook, type Shelf, type ShelfItem, type StateResponse } from '../lib/types';
 import styles from './PublicShelf.module.css';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 
 class SignInRequired extends Error {}
 const sameBook=(book:Book,other:PublicBook)=>book.title.trim().toLocaleLowerCase()===other.title.trim().toLocaleLowerCase()&&book.author.trim().toLocaleLowerCase()===other.author.trim().toLocaleLowerCase();
-const importBook=(book:PublicBook):Book=>({...newBook(book.title,book.author),coverUrl:book.coverUrl,color:book.color});
+const importBook=(book:PublicBook):Book=>({...newBook(book.title,book.author),coverUrl:book.coverUrl,color:book.color, ...(book.pages!==undefined?{pages:book.pages}:{}), ...(book.format?{format:book.format}:{}), ...(book.dimensions?{dimensions:{...book.dimensions}}:{}), ...(book.spineUrl?{spineUrl:book.spineUrl}:{})});
 
 function PublicCover({book,detail=false}:{book:PublicBook;detail?:boolean}) {
   const [failed,setFailed]=useState(false);
   return <span className={detail?styles.detailCover:styles.miniCover} style={{background:book.color}}>
-    {book.coverUrl&&!failed?<img src={book.coverUrl} alt={detail?`Cover of ${book.title}`:''} loading="lazy" onError={()=>setFailed(true)}/>:<><span aria-hidden="true">//</span>{detail?<strong>{book.title}</strong>:null}</>}
+    {book.coverUrl&&!failed?<img src={book.coverUrl} alt={detail?`Cover of ${book.title}`:''} loading="lazy" onError={()=>setFailed(true)}/>:<><BrandMark/>{detail?<strong>{book.title}</strong>:null}</>}
   </span>;
 }
 
@@ -107,21 +108,21 @@ export default function PublicShelf({id}:{id:string}) {
 
   return <div className={styles.page}>
     <header className={styles.header}>
-      <a href="/" className={styles.logo} aria-label="Cybershelf home"><span aria-hidden="true">//</span> cybershelf<span className={styles.beta}>BETA</span></a>
+      <a href="/" className={styles.logo} aria-label="Cybershelf home"><BrandMark/> cybershelf<span className={styles.beta}>BETA</span></a>
       <a className={styles.headerLink} href="/">A shelf of your own <span aria-hidden="true">↗</span></a>
     </header>
     <main className={styles.main}>
-      {loading?<section className={styles.loading} aria-busy="true" aria-label="Loading shared shelf"><div className={styles.loadingMark}>//</div><p>Finding your place on the shelf…</p></section>:error?<section className={styles.emptyState}>
+      {loading?<section className={styles.loading} aria-busy="true" aria-label="Loading shared shelf"><div className={styles.loadingMark}><BrandMark/></div><p>Finding your place on the shelf…</p></section>:error?<section className={styles.emptyState}>
         <span className={styles.eyebrow}>A QUIET CORNER</span><h1>Shelf unavailable</h1><p>{error}</p><a className={styles.primary} href="/">Explore cybershelf <span aria-hidden="true">↗</span></a>
       </section>:publication?<>
         <section className={styles.intro}>
           <span className={styles.eyebrow}><span className={styles.ownerDot} aria-hidden="true"/> ON {publication.name.toLocaleUpperCase()}’S SHELF</span>
-          <h1>{publication.shelf.title}</h1>
+          <h1>{publication.shelf.title}</h1>{publication.profileId&&<a className={styles.ownerLink} href={'/u/'+publication.profileId}>Visit {publication.name}’s profile <span aria-hidden="true">↗</span></a>}
           {publication.shelf.description?<p className={styles.description}>{publication.shelf.description}</p>:null}
           <div className={styles.meta}><span>{publication.bookCount} {publication.bookCount===1?'BOOK':'BOOKS'}</span><span aria-hidden="true">/</span><span>A LITTLE WORLD, SHARED</span></div>
         </section>
         <section className={styles.display} aria-label="Shared bookshelf"><ShelfCanvas shelf={publication.shelf} books={publication.books} onBookOpen={bookId=>openBook(publication.books.find(book=>book.id===bookId)||null)}/></section>
-        <div className={styles.belowShelf}><p>Every shelf tells a story. Pick a book to begin.</p><span aria-hidden="true">//</span></div>
+        <div className={styles.belowShelf}><p>Every shelf tells a story. Pick a book to begin.</p><BrandMark/></div>
         <section className={styles.copySection}>
           <div><h2>A little inspiration for your own shelf.</h2><p>Keep the books and arrangement. Bring your own personality.</p></div>
           {copiedShelf?<a href="/" className={styles.primary}>Open my shelves <span aria-hidden="true">↗</span></a>:<button type="button" className={styles.primary} disabled={busy} onClick={copyShelf}>{busy?'Saving…':'Make a shelf like this'}<span aria-hidden="true">↗</span></button>}
@@ -137,7 +138,7 @@ export default function PublicShelf({id}:{id:string}) {
         </section>:null}
       </>:null}
     </main>
-    <footer className={styles.footer}><a href="/" className={styles.footerLogo}>// cybershelf</a><p>Your books. Your little corner of the internet.</p><span>MADE FOR KEEPING</span></footer>
+    <footer className={styles.footer}><a href="/" className={styles.footerLogo}><BrandMark/>cybershelf</a><p>Your books. Your little corner of the internet.</p><span>MADE FOR KEEPING</span></footer>
     <dialog ref={dialog} className={styles.dialog} onCancel={()=>setSelected(null)} onClick={event=>{if(event.target===event.currentTarget)setSelected(null);}} aria-labelledby="public-book-title">
       {selected?<div className={styles.dialogBody}>
         <button type="button" autoFocus className={styles.close} aria-label="Close book details" onClick={()=>setSelected(null)}>×</button>

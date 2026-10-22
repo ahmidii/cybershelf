@@ -16,8 +16,14 @@ export async function DELETE(request:Request,context:Context){return handled(asy
   const asset=await getAsset(id,user.userId);if(!asset)throw new HttpError(404,'File not found.');
   const library=await getLibrary(user.userId);
   if(library && referencedAssets(JSON.parse(library.state) as AppState).some(ref=>ref.id===id))throw new HttpError(409,'Remove this file from your library or shelves before deleting it.');
-  const published=await database().prepare('SELECT image_ids FROM publications WHERE owner_id = ?').bind(user.userId).all<{image_ids:string}>();
-  if(published.results.some(p=>JSON.parse(p.image_ids).includes(id)))throw new HttpError(409,'Unpublish or update shelves that use this image before deleting it.');
-  await database().prepare('DELETE FROM assets WHERE id = ? AND owner_id = ?').bind(id,user.userId).run();
+  // Published profiles and reading entries own independent image snapshots.
+  // Keep the liveness checks inside the delete, including the exact captured
+  // profile identity for journals; an old, hidden entry must not pin an image.
+  const deleted=await database().prepare(`DELETE FROM assets WHERE id = ? AND owner_id = ?
+    AND NOT EXISTS (SELECT 1 FROM publications p, json_each(p.image_ids) image WHERE p.owner_id = assets.owner_id AND image.value = assets.id)
+    AND NOT EXISTS (SELECT 1 FROM public_profiles p, json_each(p.image_ids) image WHERE p.owner_id = assets.owner_id AND image.value = assets.id)
+    AND NOT EXISTS (SELECT 1 FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id, json_each(p.image_ids) image WHERE p.owner_id = assets.owner_id AND image.value = assets.id)`)
+    .bind(id,user.userId).run();
+  if(!deleted.meta.changes)throw new HttpError(409,'Update or unpublish the shared shelves, profile, or reading entries that use this image before deleting it.');
   await bucket().delete(asset.object_key);return json({deleted:true});
 });}

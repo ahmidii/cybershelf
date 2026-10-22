@@ -55,8 +55,11 @@ export default function DecorArt({kind,className}:{kind:DecorKind;className?:str
     <path d="M71 103Q87 126 74 141" fill="none" stroke="#c2b8a0" strokeWidth="3"/>
   </svg>;
   return <svg {...common}>
-    <path d="M15 138H105" stroke="#9c6d4b" strokeWidth="8" strokeLinecap="round"/>
-    <path d="M28 131L50 62M61 131L83 62" stroke="#bb895d" strokeWidth="13" strokeLinecap="square"/>
-    <path d="M34 131L56 62M67 131L89 62" stroke="#d0a574" strokeWidth="4"/>
+    <ellipse cx="62" cy="145" rx="45" ry="4" fill="#684b31" opacity=".13"/>
+    <path d="M20 141V103a34 34 0 0 1 34-34v72Z" fill="#b78c69"/>
+    <path d="M26 138v-34a28 28 0 0 1 22-28v62Z" fill="#cda783"/>
+    <path d="M64 141V87a34 34 0 0 1 34 34v20Z" fill="#ba9473"/>
+    <path d="M70 138V95a28 28 0 0 1 22 27v16Z" fill="#ddbea0"/>
+    <path d="M18 142h82" stroke="#987452" strokeWidth="4" strokeLinecap="round"/>
   </svg>;
 }

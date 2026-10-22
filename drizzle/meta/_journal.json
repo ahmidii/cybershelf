@@ -15,6 +15,27 @@
       "when": 1792651723075,
       "tag": "0001_standalone_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792661723492,
+      "tag": "0002_featured_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792662409343,
+      "tag": "0003_reading_journal",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792662556696,
+      "tag": "0004_feeds",
+      "breakpoints": true
     }
   ]
 }

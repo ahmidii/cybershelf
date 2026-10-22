@@ -83,6 +83,49 @@ test('JSON restores published cover references and zero-page metadata within ser
   assert.throws(() => parseCatalogJSON(catalogJSON(state)), /profile bio/);
 });
 
+test('book appearance, lean, and featured shelf survive backup without restoring public identities', () => {
+  const state = createDemoState();
+  state.books[0].dimensions = { heightMm: 220, widthMm: 145, thicknessMm: 28, source: 'manual' };
+  state.books[0].format = 'hardcover'; state.books[0].spineUrl = '/api/assets/private_spine';
+  state.books[1].spineUrl = '/api/profiles/public_profile/assets/public_spine';
+  state.shelves[0].items[0].lean = 'left'; state.shelves[0].publicId = 'old_publication';
+  state.profile.featuredShelfId = state.shelves[0].id;
+  const result = parseCatalogJSON(catalogJSON(state));
+  assert.deepEqual(result.books[0].dimensions, state.books[0].dimensions);
+  assert.equal(result.books[0].format, 'hardcover');
+  assert.equal(result.books[0].spineUrl, state.books[0].spineUrl);
+  assert.equal(result.books[1].spineUrl, state.books[1].spineUrl);
+  assert.equal(result.shelves[0].items[0].lean, 'left');
+  assert.equal(result.profile.featuredShelfId, state.shelves[0].id);
+  assert.equal(result.shelves[0].publicId, undefined);
+  state.profile.featuredShelfId = 'deleted_shelf';
+  assert.equal(parseCatalogJSON(catalogJSON(state)).profile.featuredShelfId, undefined);
+  state.books[0].dimensions.thicknessMm = 1000;
+  assert.throws(() => parseCatalogJSON(catalogJSON(state)), /spine thickness/);
+});
+
+test('CSV appearance fields round-trip with unit bounds and unsafe image rejection', () => {
+  const book = newBook('An edition', 'A reader');
+  book.format = 'pocket'; book.color = '#123456';
+  book.dimensions = { heightMm: 178, widthMm: 110, thicknessMm: 21, source: 'manual' };
+  book.spineUrl = 'https://example.org/spine.jpg'; book.coverUrl = 'https://example.org/cover.jpg';
+  const result = parseGoodreadsCSV(catalogCSV([book])).books[0];
+  assert.deepEqual(result.dimensions, book.dimensions);
+  assert.equal(result.spineUrl, book.spineUrl); assert.equal(result.format, book.format); assert.equal(result.color, book.color);
+  const unsafe = parseGoodreadsCSV('Title,Height (mm),Cover Width (mm),Spine Thickness (mm),Spine Image URL\nBook,200,130,999,javascript:alert(1)\n');
+  assert.equal(unsafe.books[0].dimensions, undefined); assert.equal(unsafe.books[0].spineUrl, undefined);
+  assert.equal(unsafe.warnings.length, 2);
+});
+
+test('complete backup includes a private spine once even when also used as cover art', async () => {
+  const state = createDemoState();
+  state.books[0].spineUrl = '/api/assets/spine_1'; state.books[1].coverUrl = '/api/assets/spine_1';
+  const originalFetch = globalThis.fetch; const paths: string[] = [];
+  globalThis.fetch = (async (path: RequestInfo | URL) => { paths.push(String(path)); return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } }); }) as typeof fetch;
+  try { const archive = await createBackupArchive(state); assert.ok(archive.size > 3); assert.deepEqual(paths, ['/api/assets/spine_1']); }
+  finally { globalThis.fetch = originalFetch; }
+});
+
 test('JSON rejects unsafe links, unknown books, duplicate IDs, and unsupported formats', () => {
   const unsafe = createDemoState(); unsafe.books[0].coverUrl = 'javascript:alert(1)';
   assert.throws(() => parseCatalogJSON(JSON.stringify(unsafe)), /http or https/);
@@ -150,4 +193,74 @@ test('complete backup fails clearly when an original file is no longer accessibl
   globalThis.fetch = (async () => new Response('not found', { status: 404 })) as typeof fetch;
   try { await assert.rejects(() => createBackupArchive(state), /No partial backup was created/); }
   finally { globalThis.fetch = originalFetch; }
+});
+
+test('private reading logs round-trip through JSON and CSV without restoring public post identities', () => {
+  const state = createDemoState();
+  const entries = [
+    { id: 'log_first', body: 'A thought, with a "quote"\nand a second line.', page: 42, progress: 18.5, createdAt: '2026-10-22T09:30:00.000Z' },
+    { id: 'log_second', body: '', progress: 50, createdAt: '2026-10-23T10:00:00.000Z' },
+  ];
+  state.books[0].readingLog = entries;
+  state.books[0].coverUrl = '/api/journal/shared_post/assets/public_cover';
+  state.books[0].spineUrl = '/api/journal/shared_post/assets/public_spine';
+  const poisoned = JSON.parse(catalogJSON(state));
+  poisoned.books[0].readingLog[0].postId = 'public_post_not_restored';
+  poisoned.books[0].readingLog[0].published = true;
+  poisoned.books[0].readingLog[0].comments = [{ body: 'This is external data' }];
+  poisoned.profile.publicId = 'public_profile_not_restored';
+  const restored = parseCatalogJSON(JSON.stringify(poisoned));
+  assert.deepEqual(restored.books[0].readingLog, entries);
+  assert.equal(restored.books[0].coverUrl, state.books[0].coverUrl);
+  assert.equal(restored.books[0].spineUrl, state.books[0].spineUrl);
+  assert.equal('publicId' in restored.profile, false);
+  const csv = parseGoodreadsCSV(catalogCSV([state.books[0]]));
+  assert.deepEqual(csv.books[0].readingLog, entries);
+  assert.deepEqual(csv.warnings, []);
+  assert.equal(parseCatalogJSON(catalogJSON(createDemoState())).books[0].readingLog, undefined);
+});
+
+test('JSON reading logs validate counts, global identity, progress, pages, dates, and thought bounds', () => {
+  const state = createDemoState();
+  const entry = { id: 'log_one', body: '', progress: 20, createdAt: '2026-10-22T09:30:00.000Z' };
+  const invalid = (change: Record<string, unknown>) => {
+    const value = JSON.parse(catalogJSON(state));
+    value.books[0].readingLog = [{ ...entry, ...change }];
+    return () => parseCatalogJSON(JSON.stringify(value));
+  };
+  for (const progress of [-1, 101, '30', null]) assert.throws(invalid({ progress }), /progress/);
+  for (const page of [-1, 100001, 1.5, '10']) assert.throws(invalid({ page }), /page/);
+  assert.throws(invalid({ body: 'x'.repeat(4001) }), /thought/);
+  assert.throws(invalid({ createdAt: 'invalid' }), /date/);
+  assert.throws(invalid({ id: 'with spaces' }), /identifier/);
+  state.books[0].readingLog = [entry]; state.books[1].readingLog = [{ ...entry }];
+  assert.throws(() => parseCatalogJSON(catalogJSON(state)), /duplicate IDs/);
+  state.books[1].readingLog = undefined;
+  state.books[0].readingLog = Array.from({ length: 201 }, (_, index) => ({ ...entry, id: `log_${index}` }));
+  assert.throws(() => parseCatalogJSON(catalogJSON(state)), /at most 200/);
+});
+
+test('CSV keeps a complete bounded reading log and skips malformed log fields without losing the book', () => {
+  const book = newBook('Long reading life', 'A writer');
+  book.readingLog = Array.from({ length: 200 }, (_, index) => ({ id: `log_${index}`, body: 'a'.repeat(4000), progress: index / 2, createdAt: '2026-10-22T09:30:00.000Z' }));
+  const roundTrip = parseGoodreadsCSV(catalogCSV([book]));
+  assert.deepEqual(roundTrip.books[0].readingLog, book.readingLog);
+  assert.deepEqual(roundTrip.warnings, []);
+  const bad = parseGoodreadsCSV('Title,Author,Reading Log\nA book,A writer,"[{""id"":""log_1"",""progress"":101}]"\n');
+  assert.equal(bad.books.length, 1);
+  assert.equal(bad.books[0].readingLog, undefined);
+  assert.match(bad.warnings[0], /invalid reading log/);
+});
+
+test('merging an imported copied log gives collisions a fresh private identity and preserves existing history', () => {
+  const entry = { id: 'log_shared_private_id', body: 'The same old thought', progress: 30, createdAt: '2026-10-22T09:30:00.000Z' };
+  const existing = { ...newBook('One book', 'A writer'), readingLog: [entry] };
+  const incoming = { ...newBook('Another book', 'A writer'), readingLog: [{ ...entry }] };
+  const merged = mergeBooks([existing], [incoming]);
+  assert.equal(merged.books[0].readingLog![0].id, entry.id);
+  assert.notEqual(merged.books[1].readingLog![0].id, entry.id);
+  assert.equal(merged.books[1].readingLog![0].body, entry.body);
+  assert.equal(incoming.readingLog[0].id, entry.id);
+  const fileMerged = mergeImportedBooks([existing], [incoming]);
+  assert.notEqual(fileMerged.books[1].readingLog![0].id, entry.id);
 });

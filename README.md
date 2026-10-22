@@ -1,19 +1,23 @@
-# // cybershelf
+# cybershelf
 
 A place to collect books, arrange personal shelves, and keep a reading life within reach.
 
-cybershelf separates a **Library** from the shelves you make with it. A book can be something you own, borrowed, have read, or simply want to remember. Add it once, then display it on as many themed shelves as you like. The `//` mark is two books leaning together.
+cybershelf separates a **Library** from the shelves you make with it. A book can be something you own, borrowed, have read, or simply want to remember. Add it once, then display it on as many themed shelves as you like. The drawn mark keeps the original idea of two books leaning together, paired with a consistent serif-and-sans interface.
 
-This repository contains the first release: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
+This repository contains version 0.2: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
 
 ## What you can do
 
 - **Collect books:** search book metadata, enter a title manually, import a Goodreads CSV, or upload an EPUB/PDF. File imports can attach another original to an existing book without replacing its reviews or notes.
-- **Make several shelves:** name and duplicate them, choose Open shelves, Cubby, or Tower, and combine Balanced, Gallery, or Stacks layouts with Paper, Warm oak, Moss, or Ink finishes.
+- **Make several shelves:** name and duplicate them, choose Open shelves, Cubby, or Tower, and combine Spines together, Gallery, or Stacks layouts with Paper, Warm oak, Moss, or Ink finishes.
 - **Arrange with control:** move books, change how they face, pin objects, and preview sorting by title, author, or stored cover color. Apply or cancel a preview, or undo a shelf edit. Smaller layouts keep overflow in **Not placed yet**.
+- **Make books feel physical:** use proportional heights and spine widths, tightly packed spines, cover-out displays, horizontal piles, and supported leaning. ISBN-specific metadata can improve dimensions; otherwise estimates work immediately. Fine-tune measurements or upload your own spine image.
 - **Decorate:** use the built-in plant, bear, robot, vase, and bookend, or upload a PNG, JPEG, or WebP image.
 - **Grab a book:** download your uploaded original, open a saved reading-platform or library link, or check the location of a physical copy. A catalog entry does not imply ownership.
-- **Keep a reading journal:** set reading status and manual progress, rate books, and write reviews or private notes. The first-release journal and reviews are private.
+- **Keep a reading journal:** save a thought or progress-only milestone at a page/percentage. Each entry keeps its own marker as you read on. Save privately or deliberately share an individual update. Existing reviews and notes remain private.
+- **Introduce yourself:** choose one featured shelf, preview your profile, and publish it when ready. Your profile has a stable public link while published.
+- **Read with company:** follow public profiles, browse shared reading journeys, and reply to individual entries with your own progress marker. Thoughts beyond your saved progress, or about unread books, are hidden by default until you reveal them.
+- **Keep a reading circle:** the Following feed includes shared journal updates, replies, newly published or updated shelves, and explicit “bought a book” / “added to my library” posts. Private library changes and imports are never broadcast.
 - **Share deliberately:** publish a shelf snapshot, browse published shelves, save an interesting title, or make your own version of another shelf's arrangement. Custom artwork stays with its owner when a shelf is copied.
 - **Take your data with you:** export catalog/shelves as JSON, reading records as CSV, and uploaded originals in a ZIP backup.
 
@@ -21,19 +25,23 @@ The guest preview is labelled sample content. Editing as a guest creates a draft
 
 ## What this release does not connect automatically
 
-Goodreads support is a **CSV import**, not a live account connection. Reading-platform sources are links you save. There is no automatic retailer purchase synchronization, DRM removal, cross-reader progress synchronization, OPDS server, or full in-browser EPUB reader in this release. Uploaded originals can be downloaded and opened in a compatible reader; platform links open the respective service.
+Goodreads support is a **CSV import**, not a live account connection. Reading-platform sources are links you save. Purchase announcements are manual, explicit shares. There is no automatic retailer purchase synchronization, DRM removal, cross-reader progress synchronization, OPDS server, or full in-browser EPUB reader in this release. Uploaded originals can be downloaded and opened in a compatible reader; platform links open the respective service.
 
-A shelf is also useful for planning a physical arrangement, but its geometry is a visual preview. It does not measure your books or promise that they fit a real bookcase.
+A shelf is useful for planning a physical arrangement. Books use approximate millimetre proportions and a constrained settling layout; crowded compartments scale together to fit the screen. This is a visual preview, not a guarantee that books fit a real bookcase. Metadata is often incomplete, so estimated dimensions are labelled and editable.
 
-## Private libraries and public shelves
+## Private libraries and deliberate sharing
 
-The account library, source links, physical locations, original book files, reading progress, reviews, and notes stay private. Publishing constructs a separate snapshot containing the chosen display name, shelf title and description, visible books, arrangement, and decorations. The staging tray is excluded. Editing a library does not update that snapshot until the owner publishes an update.
+Your account library, source links, physical locations, original book files, reviews, and private notes stay private. Publishing a shelf creates a separate snapshot containing the display name, shelf title/description, visible books, arrangement, and decorations. The staging tray is excluded. Selecting a featured shelf stays private until you publish your profile, which is independent of Explore shelf publications.
 
-Uploaded cover images and decorations used in a published snapshot are accessible through that publication. Original book files never use that public path. Unpublishing removes the snapshot and its image access; it cannot recall a copy someone already downloaded or saved. A hosting-level audience restriction still applies if the entire deployed site is private.
+Reading entries start private. **Share update** publishes only the chosen entry, its marker, and the book’s public metadata. Future edits stay private until you update the shared entry. Replies are public within that conversation. Do not put later events under an earlier marker: spoiler controls compare declared progress, not the meaning of the text, and public writing is not confidential. Editions are matched conservatively by normalized title and author, with percentages used across page counts; readers can adjust the protection locally.
+
+Uploaded cover/spine images and decorations in a published snapshot use revocable public image links. Original book files never use those paths. Unpublishing a profile hides its journal and profile-linked activity; publishing a new profile does not automatically re-share the old journal entries. Unsharing an entry removes its conversation. Deleting a private entry or book also removes its shared entry after the library save succeeds. Separately published shelves remain visible until explicitly unpublished. Copies already saved by someone else cannot be recalled.
+
+Follows connect readers to a currently public profile. Book purchases and additions are shared explicitly; a library entry does not prove ownership. New shelf activity is based on publishing a shelf, never on creating a private draft. The feed refreshes when opened, when the tab returns to focus, and periodically while visible; a manual refresh control is also available. No email, push notification, or automatic retailer connection is added.
 
 See [the architecture notes](docs/architecture.md) for the API and ownership boundaries.
 
-## First-release limits
+## Release limits
 
 | Resource | Limit |
 | --- | --- |
@@ -45,6 +53,10 @@ See [the architecture notes](docs/architecture.md) for the API and ownership bou
 | Uploaded storage | 500 MB or 1,000 files per account |
 | Goodreads CSV import | 10 MB and 2,000 book rows |
 | Complete ZIP export | 100 MB |
+| Reading updates | 200 per book, 4,000 characters each |
+| Replies | 100 per shared entry, 4,000 characters each |
+| Reply posting | 10 per minute and 200 per day |
+| Following | 500 readers |
 
 Limits are currently implemented using powers of 1,024 bytes. Large libraries can export their catalog and download originals individually if they exceed the ZIP limit. Unknown or unreadable book metadata remains editable.
 
@@ -75,13 +87,13 @@ pnpm run test:worker
 pnpm run deploy -- --dry-run
 ```
 
-The regression suite covers imports, backups, shelf arrangements, validation, public/private field separation, and authentication boundaries. The Worker integration check runs the built application with disposable local D1/R2 storage and real account/session cookies. It does not use the production database or a Cloudflare API token. A deploy dry run validates the upload without applying remote migrations or publishing.
+The regression suite covers imports, backup round trips, physical shelf geometry, reading markers, validation, public/private field separation, and authentication boundaries. The Worker integration check runs the built application with disposable local D1/R2 storage and real account/session cookies. It does not use the production database or a Cloudflare API token. A deploy dry run validates the upload without applying remote migrations or publishing.
 
 `pnpm run start --port 5173` previews the built Worker locally. Match `.dev.vars` to the origin you open. The separate `test:integration` command can target an existing local server through `CYBERSHELF_TEST_BASE_URL`; it refuses remote targets and creates temporary test accounts.
 
 ## Backup and restore
 
-JSON exports preserve catalog metadata, shelves, journal entries, and private file references. Restoring JSON on the original account reconnects files that still exist. A ZIP export additionally contains original uploads and a manifest mapping asset IDs to archive paths.
+JSON exports preserve catalog metadata, physical book appearance, shelves, the featured-shelf choice, private journal entries, and file references. They do not transfer public profile identities, follows, public conversations, or publication permissions. CSV exports include reading-log JSON in an optional column. Restoring JSON on the original account reconnects files that still exist. A ZIP export additionally contains original uploads and a manifest mapping asset IDs to archive paths.
 
 This release restores the catalog JSON, not the ZIP as a single operation. For a different account or deployment, upload the files again and reconnect them; an imported asset ID does not transfer access to another account's files. Externally hosted covers and retailer purchases remain external links. Keep backups somewhere private if they contain notes, reviews, sources, or book files.
 

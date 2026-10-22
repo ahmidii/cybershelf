@@ -1,5 +1,6 @@
 import { newBook, shelfCapacity, uid } from './types';
-import type { AppState, Book, BookSource, ReadingStatus, Shelf, ShelfItem } from './types';
+import type { AppState, Book, BookSource, ReadingLogEntry, ReadingStatus, Shelf, ShelfItem } from './types';
+import { validBookDimensions } from './book-size';
 
 const MAX_CSV_BYTES = 10 * 1024 * 1024;
 const MAX_STATE_BYTES = 2 * 1024 * 1024;
@@ -73,7 +74,9 @@ function csvRows(input: string): string[][] {
     else if (closedQuote && /[ \t]/.test(char)) continue;
     else if (closedQuote) throw new Error(`The CSV contains an unexpected character after a closing quote near row ${rows.length + 1}.`);
     else field += char;
-    if (field.length > 100_000) throw new Error('A CSV field is too long. Shorten very large reviews before importing.');
+    // A complete, bounded reading log can hold 200 thoughts of 4,000 characters.
+    // Keep it in one portable CSV field while the whole upload remains capped.
+    if (field.length > 1_000_000) throw new Error('A CSV field is larger than 1 MB. Split very large imports into smaller files.');
   }
   if (quoted) throw new Error('The CSV ends inside a quoted field. Export it again and try the complete file.');
   if (field || row.length || closedQuote) pushRow();
@@ -122,6 +125,22 @@ export function parseGoodreadsCSV(text: string): { books: Book[]; warnings: stri
     book.finishedAt = dateValue(get('date read'));
     const pages = Number(get('number of pages'));
     if (Number.isInteger(pages) && pages > 0 && pages <= 100000) book.pages = pages;
+    const format = get('book format');
+    if (['paperback', 'hardcover', 'pocket', 'large'].includes(format)) book.format = format as Book['format'];
+    const measurements = [get('height (mm)'), get('cover width (mm)'), get('spine thickness (mm)')];
+    if (measurements.some(Boolean)) {
+      const dimensions = { heightMm: Number(measurements[0]), widthMm: Number(measurements[1]), thicknessMm: Number(measurements[2]), source: get('size source') || 'manual' };
+      if (measurements.every(Boolean) && validBookDimensions(dimensions)) book.dimensions = dimensions;
+      else warnings.push(`“${title}”: incomplete or invalid measurements were replaced with an automatic size estimate.`);
+    }
+    const spineColor = get('spine color');
+    if (/^#[\da-f]{6}$/i.test(spineColor)) book.color = spineColor;
+    for (const [column, property] of [['cover image url', 'coverUrl'], ['spine image url', 'spineUrl']] as const) {
+      const image = get(column);
+      if (image) { try { book[property] = url(image, `${title} ${column}`, true); } catch { warnings.push(`“${title}”: an invalid ${column} was skipped.`); } }
+    }
+    const readingLog = get('reading log');
+    if (readingLog) { try { book.readingLog = parseReadingLog(JSON.parse(readingLog), `${title} reading log`); } catch { warnings.push(`“${title}”: an invalid reading log was skipped. The book and its other reading details were kept.`); } }
     const progress = Number(get('progress').replace('%', ''));
     book.progress = book.status === 'read' ? 100 : Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
     books.push(book);
@@ -142,6 +161,7 @@ function titleKey(book: Book): string {
 /** Existing records win. Re-importing cannot replace reviews, notes, or links. */
 export function mergeBooks(existing: Book[], incoming: Book[]): { books: Book[]; added: number; duplicates: number } {
   const books = [...existing], isbns = new Set<string>(), titleEditions = new Map<string, Set<string>>();
+  const readingIds = new Set(existing.flatMap(book => book.readingLog?.map(entry => entry.id) ?? []));
   const index = (book: Book) => {
     const isbn = normalizeISBN(book.isbn ?? '') ?? '';
     if (isbn) isbns.add(isbn);
@@ -155,7 +175,8 @@ export function mergeBooks(existing: Book[], incoming: Book[]): { books: Book[];
     const isbn = normalizeISBN(book.isbn ?? '') ?? '', editions = titleEditions.get(titleKey(book));
     if ((isbn && isbns.has(isbn)) || (editions && (!isbn || editions.has('')))) { duplicates++; continue; }
     if (books.length >= MAX_BOOKS) throw new Error('Your library can hold 2,000 books in this release. Remove books or import a smaller selection.');
-    books.push(book); index(book); added++;
+    const imported = withUniqueReadingIds(book, readingIds);
+    books.push(imported); index(imported); added++;
   }
   return { books, added, duplicates };
 }
@@ -164,6 +185,7 @@ export function mergeBooks(existing: Book[], incoming: Book[]): { books: Book[];
  * attaching new originals to existing records. Personal reading data wins. */
 export function mergeImportedBooks(existing: Book[], incoming: Book[]): { books: Book[]; added: number; duplicates: number; attached: number } {
   const books = [...existing];
+  const readingIds = new Set(existing.flatMap(book => book.readingLog?.map(entry => entry.id) ?? []));
   let added = 0, duplicates = 0, attached = 0;
   for (const imported of incoming) {
     const isbn = normalizeISBN(imported.isbn ?? '') ?? '', key = titleKey(imported);
@@ -171,7 +193,7 @@ export function mergeImportedBooks(existing: Book[], incoming: Book[]): { books:
     const matchingIndex = matchingISBN >= 0 ? matchingISBN : books.findIndex(book => titleKey(book) === key && (!isbn || !normalizeISBN(book.isbn ?? '')));
     if (matchingIndex < 0) {
       if (books.length >= MAX_BOOKS) throw new Error('Your library can hold 2,000 books in this release. Remove books or import a smaller selection.');
-      books.push(imported); added++; continue;
+      books.push(withUniqueReadingIds(imported, readingIds)); added++; continue;
     }
     duplicates++;
     const current = books[matchingIndex], assets = new Set(current.sources.filter(source => source.kind === 'file').map(source => source.assetId));
@@ -187,6 +209,17 @@ export function mergeImportedBooks(existing: Book[], incoming: Book[]): { books:
     books[matchingIndex] = { ...current, ...cover, sources };
   }
   return { books, added, duplicates, attached };
+}
+
+/** A copied CSV can contain the same private log IDs under another title.
+ * Give only colliding entries fresh private identities; public post IDs are never imported. */
+function withUniqueReadingIds(book: Book, used: Set<string>): Book {
+  if (!book.readingLog) return book;
+  const readingLog = book.readingLog.map(entry => {
+    const next = used.has(entry.id) ? { ...entry, id: uid('log_') } : entry;
+    used.add(next.id); return next;
+  });
+  return { ...book, readingLog };
 }
 
 type RecordValue = Record<string, unknown>;
@@ -220,8 +253,8 @@ function enumValue<T extends string>(value: unknown, values: readonly T[], conte
 function url(value: unknown, context: string, allowAsset = false): string {
   const text = string(value, context, 2048, '');
   if (!text) return '';
-  if (allowAsset && /^\/api\/assets\/[a-z\d_-]+$/i.test(text)) return text;
-  if (allowAsset && /^\/api\/publications\/[a-z\d_-]+\/assets\/[a-z\d_-]+$/i.test(text)) return text;
+  if (allowAsset && /^\/api\/assets\/[a-z\d_-]{1,100}$/i.test(text)) return text;
+  if (allowAsset && /^\/api\/(?:publications|profiles|journal)\/[a-z\d_-]{1,100}\/assets\/[a-z\d_-]{1,100}$/i.test(text)) return text;
   try { const parsed = new URL(text); if (['https:', 'http:'].includes(parsed.protocol) && !parsed.username && !parsed.password) return parsed.href; } catch { /* handled below */ }
   throw new Error(`Invalid backup: ${context} must use an http or https URL.`);
 }
@@ -231,6 +264,25 @@ function date(value: unknown, context: string): string {
   return new Date(text).toISOString();
 }
 function unique(values: string[], context: string) { if (new Set(values).size !== values.length) throw new Error(`Invalid backup: ${context} contains duplicate IDs.`); }
+
+function parseReadingLog(value: unknown, context: string): ReadingLogEntry[] {
+  const entries = list(value, context, 200).map(raw => {
+    const entry = object(raw, `${context} entry`);
+    const result: ReadingLogEntry = {
+      id: id(entry.id, `${context} entry ID`),
+      body: string(entry.body, `${context} thought`, 4000, ''),
+      progress: number(entry.progress, `${context} progress`, 0, 100),
+      createdAt: date(entry.createdAt, `${context} date`),
+    };
+    if (entry.page !== undefined) {
+      result.page = number(entry.page, `${context} page`, 0, 100000);
+      if (!Number.isInteger(result.page)) throw new Error(`Invalid backup: ${context} page must be a whole number.`);
+    }
+    return result;
+  });
+  unique(entries.map(entry => entry.id), context);
+  return entries;
+}
 
 /** Restore account-local asset references, never public sharing identities.
  * Restoring on another account does not grant access to the original files. */
@@ -271,6 +323,18 @@ export function parseCatalogJSON(text: string): AppState {
     if (!book.title.trim()) throw new Error(`Invalid backup: ${context} has no title.`);
     if (data.isbn !== undefined) book.isbn = string(data.isbn, `${context} ISBN`, 32);
     if (data.description !== undefined) book.description = string(data.description, `${context} description`, 10000);
+    if (data.readingLog !== undefined) book.readingLog = parseReadingLog(data.readingLog, `${context} reading log`);
+    if (data.spineUrl !== undefined) book.spineUrl = url(data.spineUrl, `${context} spine URL`, true);
+    if (data.format !== undefined) book.format = enumValue(data.format, ['paperback', 'hardcover', 'pocket', 'large'] as const, `${context} book format`);
+    if (data.dimensions !== undefined) {
+      const dimensions = object(data.dimensions, `${context} dimensions`);
+      book.dimensions = {
+        heightMm: number(dimensions.heightMm, `${context} height`, 100, 500),
+        widthMm: number(dimensions.widthMm, `${context} cover width`, 60, 400),
+        thicknessMm: number(dimensions.thicknessMm, `${context} spine thickness`, 2, 150),
+        source: enumValue(dimensions.source, ['estimated', 'catalog', 'manual'] as const, `${context} size source`),
+      };
+    }
     if (data.pages !== undefined) {
       book.pages = number(data.pages, `${context} pages`, 0, 100000);
       if (!Number.isInteger(book.pages)) throw new Error(`Invalid backup: ${context} pages must be a whole number.`);
@@ -279,6 +343,7 @@ export function parseCatalogJSON(text: string): AppState {
     return book;
   });
   unique(books.map(book => book.id), 'books');
+  unique(books.flatMap(book => book.readingLog?.map(entry => entry.id) ?? []), 'reading log entries');
   const bookIds = new Set(books.map(book => book.id));
   const shelves: Shelf[] = list(root.shelves, 'shelves', 100).map((raw, index) => {
     const data = object(raw, `shelf ${index + 1}`);
@@ -298,6 +363,7 @@ export function parseCatalogJSON(text: string): AppState {
         slot: slot !== null && slot >= shelfCapacity(shelf) ? null : slot, pinned: item.pinned === true,
         facing: enumValue(item.facing ?? 'auto', ['auto', 'spine', 'cover', 'stack'] as const, 'book facing'),
       };
+      if (item.lean !== undefined) result.lean = enumValue(item.lean, ['auto', 'upright', 'left', 'right'] as const, 'book lean');
       if (result.kind === 'book') {
         result.bookId = id(item.bookId, 'shelf book ID');
         if (!bookIds.has(result.bookId)) throw new Error('Invalid backup: a shelf refers to a book missing from the catalog.');
@@ -315,7 +381,8 @@ export function parseCatalogJSON(text: string): AppState {
     return shelf;
   });
   unique(shelves.map(shelf => shelf.id), 'shelves');
-  return { schemaVersion: 1, profile: { name: string(profile.name, 'profile name', 80), bio: string(profile.bio, 'profile bio', 1000, '') }, books, shelves };
+  const featuredShelfId = profile.featuredShelfId === undefined ? undefined : id(profile.featuredShelfId, 'featured shelf');
+  return { schemaVersion: 1, profile: { name: string(profile.name, 'profile name', 80), bio: string(profile.bio, 'profile bio', 1000, ''), ...(featuredShelfId && shelves.some(shelf => shelf.id === featuredShelfId) ? { featuredShelfId } : {}) }, books, shelves };
 }
 
 interface ZipEntry { path: string; offset: number; method: number; compressed: number; size: number; }

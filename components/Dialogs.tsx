@@ -21,6 +21,6 @@ export function Modal({title,subtitle,children,onClose,wide=false}:{title:string
   document.addEventListener('keydown',key);
   return()=>{document.body.style.overflow=before;document.removeEventListener('keydown',key);if(prior?.isConnected&&!ref.current?.contains(prior))prior.focus({preventScroll:true});};
  },[]);
- return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><div ref={ref} className={'modal '+(wide?'modal-wide':'')} role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1}><header className="modal-heading"><div><p className="eyebrow">// make room</p><h2 id={id}>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button className="icon-button" onClick={onClose} aria-label="Close dialog"><X size={20}/></button></header>{children}</div></div>;
+ return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><div ref={ref} className={'modal '+(wide?'modal-wide':'')} role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1}><header className="modal-heading"><div><p className="eyebrow">make room</p><h2 id={id}>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button className="icon-button" onClick={onClose} aria-label="Close dialog"><X size={20}/></button></header>{children}</div></div>;
 }
 export function Empty({title,children,icon}:{title:string;children:React.ReactNode;icon?:React.ReactNode}){return <div className="empty-state">{icon&&<div className="empty-icon">{icon}</div>}<h2>{title}</h2><div>{children}</div></div>;}

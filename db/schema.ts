@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const libraries = sqliteTable('libraries', {
   ownerId: text('owner_id').primaryKey(),
@@ -18,6 +18,28 @@ export const publications = sqliteTable('publications', {
   snapshot: text('snapshot').notNull(), imageIds: text('image_ids').notNull(),
   publishedAt: text('published_at').notNull(), updatedAt: text('updated_at').notNull(),
 }, (table) => [uniqueIndex('publications_owner_shelf_idx').on(table.ownerId, table.shelfId), index('publications_latest_idx').on(table.updatedAt)]);
+
+// A profile is independently published: selecting a favourite shelf never
+// creates an Explore entry or exposes the rest of a reader's Library.
+export const publicProfiles = sqliteTable('public_profiles', {
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),shelfId:text('shelf_id').notNull(),
+  snapshot:text('snapshot').notNull(),imageIds:text('image_ids').notNull(),
+  publishedAt:text('published_at').notNull(),updatedAt:text('updated_at').notNull(),
+},table=>[uniqueIndex('public_profiles_owner_idx').on(table.ownerId)]);
+
+export const readingPosts=sqliteTable('reading_posts',{
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),profileId:text('profile_id').notNull(),
+  bookId:text('book_id').notNull(),entryId:text('entry_id').notNull(),snapshot:text('snapshot').notNull(),
+  imageIds:text('image_ids').notNull(),publishedAt:text('published_at').notNull(),updatedAt:text('updated_at').notNull(),
+},table=>[uniqueIndex('reading_posts_owner_entry_idx').on(table.ownerId,table.entryId),index('reading_posts_profile_date_idx').on(table.profileId,table.publishedAt)]);
+export const readingComments=sqliteTable('reading_comments',{
+  id:text('id').primaryKey(),postId:text('post_id').notNull().references(()=>readingPosts.id,{onDelete:'cascade'}),
+  ownerId:text('owner_id').notNull(),profileId:text('profile_id'),name:text('name').notNull(),body:text('body').notNull(),
+  progress:real('progress').notNull(),createdAt:text('created_at').notNull(),
+},table=>[index('reading_comments_post_date_idx').on(table.postId,table.createdAt),index('reading_comments_owner_date_idx').on(table.ownerId,table.createdAt)]);
+export const readingEvents=sqliteTable('reading_events',{
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),kind:text('kind').notNull(),createdAt:text('created_at').notNull(),
+},table=>[index('reading_events_owner_kind_date_idx').on(table.ownerId,table.kind,table.createdAt)]);
 
 // Better Auth owns these tables. Application ownership remains keyed by the
 // stable user.id from a verified, database-backed session.
@@ -73,3 +95,20 @@ export const rateLimit = sqliteTable('auth_rate_limit', {
   count: integer('count').notNull(),
   lastRequest: integer('last_request').notNull(),
 });
+
+// Follow an account's public identity without exposing its authentication ID.
+// Keeping the last public identifier permits unfollowing an unpublished reader.
+export const follows = sqliteTable('follows', {
+  followerId: text('follower_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  followedOwnerId: text('followed_owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  followedProfileId: text('followed_profile_id').notNull(),
+  createdAt: text('created_at').notNull(),
+}, table => [primaryKey({ columns: [table.followerId, table.followedOwnerId] }), index('follows_followed_idx').on(table.followedOwnerId)]);
+
+// Only explicit purchase/library announcements enter this table. Ordinary
+// catalog writes and imports never create social activity.
+export const readerActivity = sqliteTable('reader_activity', {
+  id: text('id').primaryKey(), ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  profileId: text('profile_id').notNull(), kind: text('kind', { enum: ['purchased', 'added'] }).notNull(),
+  bookId: text('book_id').notNull(), snapshot: text('snapshot').notNull(), createdAt: text('created_at').notNull(),
+}, table => [index('reader_activity_owner_date_idx').on(table.ownerId, table.createdAt), index('reader_activity_profile_date_idx').on(table.profileId, table.createdAt)]);

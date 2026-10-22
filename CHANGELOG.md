@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.0 — Shelves with character, reading with company — 2026-10-22
+
+### Added
+
+- Proportional book heights and spine widths from editable millimetre measurements, format/page-count estimates, or matched ISBN edition metadata.
+- Tight spine packing, true horizontal book piles, supported leaning against walls/books/piles/bookends, and reduced-motion-aware settling transitions.
+- Optional spine artwork with authenticated image uploads and generated title/colour fallbacks.
+- One featured shelf per profile, a private preview, explicit public profile snapshots, and public reader pages.
+- Page/percentage-stamped private reading logs, progress-only milestones, body editing, explicit entry sharing, and unsharing.
+- Public reading threads with progress-marked replies, owner moderation, per-entry links, and public profile journals with per-book reading order.
+- Following public profiles and a chronological feed of shared reading updates, replies, published shelves, and explicit purchased/added book announcements.
+- Spoiler controls based on the viewer’s saved progress, unread-book protection, local progress overrides in reading conversations, and deliberate individual reveal. Hidden prose is absent from the accessible DOM.
+- D1 migrations for profiles, journal posts/comments, persistent posting counters, follows, and book activity. Existing libraries remain compatible.
+- Regression and disposable Worker integration coverage for geometry, reading logs, public image access, social privacy, revocation, rate limits, and account boundaries.
+
+### Changed
+
+- Replaced typed ASCII branding with an outlined two-book mark and consistent readable typography.
+- Shelf controls expose facing and lean choices, dimensions, and a featured-shelf shortcut while preserving drag, tap, and keyboard placement.
+- JSON/CSV/ZIP backups preserve new book appearance and private journal data; old backups remain accepted.
+- Saving a library and revoking removed shelf/profile/journal publications now happen together in a database transaction.
+
+### Sharing boundaries
+
+- Existing notes/reviews and ordinary progress changes are not automatically published. Each journal entry and purchase/addition announcement is shared intentionally.
+- A private shelf creates no feed activity; publishing or updating its public snapshot does.
+- Unpublishing a profile hides its linked journal/feed activity. A newly published profile does not resurrect old reading posts or comments automatically.
+- Spoiler markers are reader-supplied, with approximate percentage comparisons across editions. They cannot detect incorrectly marked spoilers.
+- There is no automatic purchase/progress synchronization, email/push notification delivery, full physics engine, or physical fit guarantee in this release.
+
 ## 0.1.1 — Standalone Cloudflare deployment — 2026-10-22
 
 ### Added

@@ -1,6 +1,6 @@
 import type { AppState, Book } from './types';
 
-/** Includes catalog, reviews, layout, and private asset references. File binaries
+/** Includes catalog, reading updates, reviews, layout, and private asset references. File binaries
  * remain separate; use each book's Download original action to back those up. */
 export function catalogJSON(state: AppState): string {
   return JSON.stringify(state, null, 2);
@@ -17,12 +17,16 @@ export function catalogCSV(books: Book[]): string {
   const rows: (string | number | null | undefined)[][] = [[
     'Title', 'Author', 'ISBN13', 'My Rating', 'Exclusive Shelf', 'My Review',
     'Private Notes', 'Date Added', 'Date Read', 'Number of Pages', 'Progress', 'Sources',
+    'Book Format', 'Height (mm)', 'Cover Width (mm)', 'Spine Thickness (mm)', 'Size Source', 'Spine Color', 'Cover Image URL', 'Spine Image URL',
+    'Reading Log',
   ]];
   const statuses = { unread: 'to-read', reading: 'currently-reading', read: 'read', paused: 'paused', dnf: 'did-not-finish' };
   for (const book of books) rows.push([
     book.title, book.author, book.isbn, book.rating, statuses[book.status], book.review,
     book.notes, book.addedAt.slice(0, 10), book.finishedAt?.slice(0, 10), book.pages,
     book.progress, book.sources.map(source => `${source.label}${source.url ? `: ${source.url}` : source.location ? `: ${source.location}` : ''}`).join(' | '),
+    book.format, book.dimensions?.heightMm, book.dimensions?.widthMm, book.dimensions?.thicknessMm, book.dimensions?.source, book.color, book.coverUrl, book.spineUrl,
+    book.readingLog ? JSON.stringify(book.readingLog) : undefined,
   ]);
   return '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n') + '\r\n';
 }
@@ -91,6 +95,7 @@ export async function createBackupArchive(state: AppState, onProgress: (text: st
   for (const book of state.books) {
     for (const source of book.sources) if (source.kind === 'file' && source.assetId) assets.set(source.assetId, source.filename || `${book.title}.book`);
     addImageUrl(book.coverUrl, `${book.title}-cover`);
+    if (book.spineUrl) addImageUrl(book.spineUrl, `${book.title}-spine`);
   }
   for (const shelf of state.shelves) for (const item of shelf.items) {
     if (item.kind !== 'decor') continue;
@@ -142,7 +147,7 @@ export async function createBackupArchive(state: AppState, onProgress: (text: st
     } finally { clearTimeout(timeout); }
   }
   entries.push({ name: 'manifest.json', data: new TextEncoder().encode(JSON.stringify({ schemaVersion: 1, exportedAt: new Date().toISOString(), files: manifest }, null, 2)) });
-  entries.push({ name: 'README.txt', data: new TextEncoder().encode('cybershelf backup\n\nThe files/ folder contains your original uploaded books and images, unchanged.\ncatalog.json contains your catalog, reviews, private notes, sources, and shelf layouts.\nmanifest.json maps private asset IDs in the catalog to files in this archive.\n\nRestore catalog.json through cybershelf Settings. On the original account, existing\nprivate files will reconnect. Another account or server needs the files uploaded\nagain; importing this catalog does not transfer access to the original account.\nRemote platform purchases and externally hosted covers are links, not file copies.\n') });
+  entries.push({ name: 'README.txt', data: new TextEncoder().encode('cybershelf backup\n\nThe files/ folder contains your original uploaded books and images, unchanged.\ncatalog.json contains your catalog, private reading updates, reviews, notes, sources,\nbook appearance, and shelf layouts. Public post identities and comments are not restored.\nmanifest.json maps private asset IDs in the catalog to files in this archive.\n\nRestore catalog.json through cybershelf Settings. On the original account, existing\nprivate files will reconnect. Another account or server needs the files uploaded\nagain; importing this catalog does not transfer access to the original account.\nRemote platform purchases and externally hosted covers are links, not file copies.\n') });
   onProgress('Preparing your download…');
   const archive = storedZip(entries);
   if (archive.size > BACKUP_LIMIT) throw new Error('This backup exceeds 100 MB. Export your catalog and download originals individually.');

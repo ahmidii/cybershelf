@@ -1,9 +1,20 @@
 export type ReadingStatus = 'unread' | 'reading' | 'read' | 'paused' | 'dnf';
 export type SourceKind = 'file' | 'platform' | 'physical' | 'link';
 export interface BookSource { id: string; kind: SourceKind; label: string; url?: string; assetId?: string; filename?: string; location?: string; }
+export type BookFormat = 'paperback' | 'hardcover' | 'pocket' | 'large';
+export interface BookDimensions {
+  heightMm: number; widthMm: number; thicknessMm: number;
+  source: 'estimated' | 'catalog' | 'manual';
+}
+export interface ReadingLogEntry {
+  id: string; body: string; progress: number; page?: number;
+  createdAt: string;
+}
 export interface Book {
   id: string; title: string; author: string; coverUrl: string; color: string;
   isbn?: string; description?: string; pages?: number;
+  format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string;
+  readingLog?: ReadingLogEntry[];
   status: ReadingStatus; progress: number; rating: number | null;
   review: string; notes: string; addedAt: string; finishedAt?: string;
   sources: BookSource[];
@@ -16,22 +27,38 @@ export interface ShelfItem {
   id: string; kind: 'book' | 'decor'; bookId?: string; decor?: DecorKind;
   assetId?: string; imageUrl?: string; label?: string;
   slot: number | null; pinned: boolean; facing: 'auto' | 'spine' | 'cover' | 'stack';
+  lean?: 'auto' | 'upright' | 'left' | 'right';
 }
 export interface Shelf {
   id: string; title: string; description: string;
   bookcase: Bookcase; layout: ShelfLayout; finish: ShelfFinish;
   items: ShelfItem[]; updatedAt: string; publicId?: string;
 }
-export interface Profile { name: string; bio: string; }
+export interface Profile { name: string; bio: string; featuredShelfId?: string; }
 export interface AppState { schemaVersion: 1; profile: Profile; books: Book[]; shelves: Shelf[]; }
 export interface StateResponse { state: AppState | null; version: number; user: { id: string; name: string }; }
 export interface Asset { id: string; filename: string; mime: string; size: number; url: string; }
-export interface PublicBook { id: string; title: string; author: string; coverUrl: string; color: string; }
+export interface PublicBook { id: string; title: string; author: string; coverUrl: string; color: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string; }
 export interface Publication {
   id: string; shelf: Shelf; books: PublicBook[]; name: string;
-  publishedAt: string; bookCount: number;
+  publishedAt: string; bookCount: number; profileId?: string;
 }
-export interface SearchBook { title: string; author: string; coverUrl: string; isbn?: string; pages?: number; }
+export interface PublicProfile { id: string; name: string; bio: string; featured: Publication; publishedAt: string; updatedAt: string; }
+export interface ReadingPost {
+  id: string; profileId: string; name: string; book: PublicBook;
+  entry: ReadingLogEntry; publishedAt: string; commentCount: number;
+}
+export interface ReadingComment {
+  id: string; body: string; progress: number; name: string;
+  profileId?: string; createdAt: string; canDelete?: boolean;
+}
+export interface ActivityEvent {
+  id: string; kind: 'reading' | 'comment' | 'shelf' | 'shelf_updated' | 'purchased' | 'added';
+  createdAt: string; actor: { id: string; name: string };
+  book?: PublicBook; progress?: number; body?: string; postId?: string;
+  shelf?: Publication; commentId?: string;
+}
+export interface SearchBook { title: string; author: string; coverUrl: string; isbn?: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; }
 export const FINISHES: {id:ShelfFinish;name:string;color:string}[] = [
   {id:'paper',name:'Paper',color:'#eeede6'}, {id:'oak',name:'Warm oak',color:'#b59168'},
   {id:'moss',name:'Moss',color:'#879479'}, {id:'ink',name:'Ink',color:'#373e39'},

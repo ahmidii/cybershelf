@@ -22,8 +22,16 @@ export function createDemoState(): AppState {
     ['The House in the Cerulean Sea', 'TJ Klune', '#527f96'],
     ['Invisible Cities', 'Italo Calvino', '#b7a365'],
   ];
+  // Illustrative proportions for the sample room, not verified editions.
+  const sizes: [number, number, number][] = [
+    [232, 156, 31], [205, 132, 18], [178, 112, 13], [195, 140, 14],
+    [198, 129, 17], [210, 142, 26], [181, 111, 13], [218, 146, 23],
+    [216, 138, 22], [198, 129, 24], [234, 153, 42], [198, 128, 19],
+    [198, 129, 27], [201, 132, 20], [228, 152, 30], [181, 112, 16],
+  ];
   const books: Book[] = titles.map(([title, author, color], index) => ({
     id: `demo_book_${index + 1}`, title, author, color, coverUrl: '',
+    dimensions: { heightMm: sizes[index][0], widthMm: sizes[index][1], thicknessMm: sizes[index][2], source: 'estimated' },
     status: index === 0 || index === 8 ? 'reading' : index === 3 || index === 4 || index === 12 ? 'read' : 'unread',
     progress: index === 0 ? 42 : index === 8 ? 18 : index === 3 || index === 4 || index === 12 ? 100 : 0,
     rating: index === 4 ? 4.5 : null,
@@ -41,8 +49,8 @@ export function createDemoState(): AppState {
     bookcase: 'open', layout: 'balanced', finish: 'paper', updatedAt: date,
     items: [
       decor('quiet', 'plant', 0), book('quiet', 1, 2, 'cover'), book('quiet', 2, 3), book('quiet', 3, 4), decor('quiet', 'bookend', 6),
-      book('quiet', 4, 8), book('quiet', 5, 9, 'cover'), book('quiet', 6, 11), book('quiet', 7, 12), decor('quiet', 'vase', 14),
-      book('quiet', 8, 16), book('quiet', 13, 17), book('quiet', 14, 19, 'stack'), decor('quiet', 'bear', 21),
+      book('quiet', 4, 8, 'stack'), book('quiet', 5, 9, 'stack'), book('quiet', 6, 10, 'stack'), {...book('quiet', 7, 11),lean:'left'}, decor('quiet', 'vase', 14),
+      book('quiet', 8, 16), book('quiet', 13, 17), book('quiet', 14, 18), decor('quiet', 'bear', 21),
     ],
   }, {
     id: 'demo_shelf_worlds', title: 'Worlds to get lost in', description: 'Strange doors. Unfamiliar stars. One more chapter.',
@@ -53,5 +61,5 @@ export function createDemoState(): AppState {
       book('worlds', 16, 12), book('worlds', 2, 13), book('worlds', 4, 15), decor('worlds', 'bookend', 17),
     ],
   }];
-  return { schemaVersion: 1, profile: { name: 'The reading room', bio: 'A sample shelf to make yourself at home in.' }, books, shelves };
+  return { schemaVersion: 1, profile: { name: 'The reading room', bio: 'A sample shelf to make yourself at home in.',featuredShelfId:'demo_shelf_quiet' }, books, shelves };
 }

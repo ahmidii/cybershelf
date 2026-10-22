@@ -13,15 +13,17 @@ export async function PUT(request:Request){return handled(async()=>{
   const {state,version}=parsed.data;await checkAssetReferences(state,user.userId);
   const serialized=JSON.stringify(state);if(new TextEncoder().encode(serialized).byteLength>2*1024*1024)throw new HttpError(413,'Your library backup is too large.');
   const now=new Date().toISOString();const db=database();
-  const result=version===0
-    ?await db.prepare('INSERT INTO libraries (owner_id,state,version,updated_at) VALUES (?,?,1,?) ON CONFLICT(owner_id) DO NOTHING').bind(user.userId,serialized,now).run()
-    :await db.prepare('UPDATE libraries SET state = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(serialized,now,user.userId,version).run();
-  if(!result.meta.changes)throw new HttpError(409,'Your library changed in another tab or device. Export your local changes, then reload to get the latest version.');
-  // Removing a shelf also revokes its published snapshot. Library edits otherwise
-  // stay private until the owner explicitly publishes an updated snapshot.
-  const ids=new Set(state.shelves.map(s=>s.id));
-  const publications=await db.prepare('SELECT id,shelf_id FROM publications WHERE owner_id = ?').bind(user.userId).all<{id:string;shelf_id:string}>();
-  const removed=publications.results.filter(publication=>!ids.has(publication.shelf_id));
-  if(removed.length)await db.batch(removed.map(publication=>db.prepare('DELETE FROM publications WHERE id = ? AND owner_id = ?').bind(publication.id,user.userId)));
+  const save=version===0
+    ?db.prepare('INSERT INTO libraries (owner_id,state,version,updated_at) VALUES (?,?,1,?) ON CONFLICT(owner_id) DO NOTHING').bind(user.userId,serialized,now)
+    :db.prepare('UPDATE libraries SET state = ?, version = version + 1, updated_at = ? WHERE owner_id = ? AND version = ?').bind(serialized,now,user.userId,version);
+  // Save and revoke removed objects in one transaction. Each cleanup reads the
+  // actual saved state, so a stale save cannot remove a newer tab's publication.
+  const results=await db.batch([
+    save,
+    db.prepare("DELETE FROM publications WHERE owner_id = ? AND shelf_id NOT IN (SELECT json_extract(s.value, '$.id') FROM libraries l, json_each(l.state, '$.shelves') s WHERE l.owner_id = ?)").bind(user.userId,user.userId),
+    db.prepare("DELETE FROM public_profiles WHERE owner_id = ? AND shelf_id NOT IN (SELECT json_extract(s.value, '$.id') FROM libraries l, json_each(l.state, '$.shelves') s WHERE l.owner_id = ?)").bind(user.userId,user.userId),
+    db.prepare("DELETE FROM reading_posts WHERE owner_id = ? AND (book_id,entry_id) NOT IN (SELECT json_extract(b.value, '$.id'),json_extract(e.value, '$.id') FROM libraries l, json_each(l.state, '$.books') b, json_each(b.value, '$.readingLog') e WHERE l.owner_id = ?)").bind(user.userId,user.userId),
+  ]);
+  if(!results[0].meta.changes)throw new HttpError(409,'Your library changed in another tab or device. Export your local changes, then reload to get the latest version.');
   return json({version:version+1});
 });}

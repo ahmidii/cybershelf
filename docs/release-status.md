@@ -1,38 +1,42 @@
-# Release status — 0.1.1
+# Release status — 0.2.0
 
 Updated 2026-10-22.
 
 ## Source and destination
 
-The application source is published in the public [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf) repository. This update adds a standalone Cloudflare deployment and real email/password accounts to the first release. GitHub remains the source of future updates.
+The public [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf) repository remains the source for the existing Cloudflare Worker at `https://cybershelf.io`. Version 0.2 adds physical book proportions and settling, featured profiles, progress-stamped journals, public reading conversations, and a Following feed.
 
-The committed configuration targets Worker `cybershelf`, D1 `cybershelf-db` with the maintainer-provided database UUID, private R2 `cybershelf-files`, and `https://cybershelf.io`. A source push does not by itself verify that a Cloudflare deployment or the custom domain is live. Follow [self-hosting](self-hosting.md) for the build settings, D1 token permission, and runtime authentication secret.
+The existing Worker, D1 database, R2 bucket, domain, and authentication secret are reused. Migrations `0002_featured_profiles`, `0003_reading_journal`, and `0004_feeds` add the social tables. The deploy command applies pending migrations before publishing the Worker; it stops if a migration fails. Existing catalog state remains schema version 1, with optional new fields and support for older backups.
 
-## Verified for this update
+## Verification
 
-- TypeScript validation completed successfully.
-- The regression suite passed: **27 tests, no failures or skipped tests**.
-- The production Vinext build completed successfully, including the new sign-in page and authentication API route.
-- The generated Worker configuration contains the expected real database/bucket bindings, canonical origin, and custom-domain route.
-- Wrangler's deployment dry run passed without applying remote migrations or publishing.
-- Both committed SQL migrations applied to disposable local D1 storage; repeating the migration command correctly reported no pending migrations.
-- The production Worker bundle passed a one-shot integration check in workerd with ephemeral D1/R2 and external network access disabled.
-- Source files were checked for accidental credential patterns and local runtime files. Dependencies, local databases, generated builds, and secret files are excluded from source publication.
+- TypeScript validation passed with all new routes and client components.
+- **65 regression tests passed**, with no failures, skips, or cancellations. The runner reports individual test cases.
+- The production Vinext build passed, including `/u/[id]`, `/j/[id]`, and the new social API routes.
+- Wrangler’s deployment dry run passed without publishing or applying remote migrations; the generated Worker configuration retains the expected DB/BUCKET bindings and custom domain.
+- All five migrations applied to disposable D1 storage.
+- The built Worker passed end-to-end API integration checks with temporary accounts, ephemeral D1/R2, real signed sessions, and outbound network access disabled.
+- Source publication excludes dependencies, build output, temporary databases, and secrets. Dependency versions and the lockfile are unchanged.
 
-The Worker integration check exercised guest and sign-in page rendering, two real accounts, correct and incorrect passwords, signed HTTP-only/SameSite/Secure session cookies, unverified email handling, cross-origin authentication rejection, forged-header rejection, stale-account preconditions, private original uploads/downloads, account isolation, save-version conflicts, public snapshot redaction, public-image revocation, sign-out, revoked-session rejection, and concurrent database-backed rate limiting. It also verified that D1 stores salted password hashes and rate-limit counters.
+Regression coverage includes legacy import/export behaviour, JSON/CSV reading-log round trips, private spine backups, ISBN metadata parsing, geometry contact/collision checks, dimension bounds, fixed historical reading markers, and public field allowlists. Render tests verify that unread/ahead-of-progress prose is absent from the DOM, while explicit reveal preferences and safe markers allow it to render.
 
-The application regression suite covers Goodreads CSV parsing, original-file attachment, import/export round trips, ZIP byte preservation, shelf-arrangement invariants, strict state validation, public/private field separation, safe sign-in redirects, and fail-closed authentication configuration.
+The Worker suite exercises account isolation, stale-account headers, optimistic save conflicts, concurrent publication/removal, profile snapshots independent of Explore, private edits remaining private, source/file redaction, public-image retention and revocation, journal sharing/unsharing, reply moderation, persistent posting limits, effective reply markers after a parent update, feed/announcement pagination, explicit acquisition sharing, follows across profile privacy changes, session revocation, and authentication rate limiting.
 
-## Verification still pending
+## Visual verification
 
-Browser-based visual, responsive, and keyboard-interaction QA remains incomplete because the preview browser was unavailable. Successful server rendering does not establish that visual QA passed.
+The managed local preview supervisor was unavailable in this workspace, so local browser-based visual, responsive, and keyboard-interaction QA could not be completed. Production build, API, geometry, and markup checks do not establish that a full browser/device review passed.
 
-The local runtime checks do not prove deployed DNS, TLS, Cloudflare token permissions, runtime secret configuration, or production CPU usage. After deployment, verify account creation, sign-in, a persisted shelf, an original-file download, and a signed-out public share link at the actual custom domain.
+A source push and local dry run do not by themselves prove that Cloudflare’s production build or domain deployment completed. Check the latest Workers Builds deployment for the pushed commit and open the actual domain after deployment. No real account data is used by the integration tests.
 
-## Account and product boundaries
+## Product boundaries
 
-Basic accounts use email and password. Email delivery, email verification, and forgotten-password recovery are not configured in this release. Automatic account linking is disabled. The signup screen states the recovery limitation. Legacy caller-supplied identity headers are not authentication.
+- Book dimensions are labelled estimates, catalog values, or manual measurements. Generated spines are a visual fallback; optional uploaded art can supply an actual spine. Shelves scale to the available display and do not guarantee a real-world fit.
+- Settling is deterministic constrained geometry with animation, not a general physics simulation.
+- Existing reviews, notes, ordinary progress changes, and private shelf creation stay private. Journal entries and acquisition announcements are shared explicitly.
+- Spoiler protection follows reader-supplied markers and conservative title/author matching. Percentage comparisons across editions are approximate, and incorrectly marked text can still spoil a story.
+- The feed is an in-app stream with refresh-on-focus/visibility and periodic refresh while visible. Email and push notifications are not included.
+- Goodreads support remains CSV import. Retailer sources are saved links; purchases and reader progress do not synchronize automatically. Original EPUB/PDF uploads can be retrieved, but DRM removal, OPDS, and a full EPUB reader are not included.
+- Basic accounts retain the existing email/password flow. Email delivery and forgotten-password recovery are not configured; the signup screen explains this.
+- Catalog backups include private reading history and physical shelf metadata. They do not transfer social identities, follows, public conversations, or sharing permissions. Cross-account ZIP restoration still requires reconnecting uploaded originals.
 
-Goodreads support remains CSV import; retailer sources remain saved links. There is no automatic purchase sync, cross-reader progress sync, DRM removal, OPDS endpoint, or full EPUB reader. Reviews and reading journal data are private. ZIP export includes original uploads, but full cross-account ZIP restore is not implemented as a single operation.
-
-See the [README](../README.md), [changelog](../CHANGELOG.md), and [Cloudflare setup guide](self-hosting.md).
+See the [README](../README.md), [changelog](../CHANGELOG.md), [architecture](architecture.md), and [Cloudflare setup guide](self-hosting.md).
