@@ -8,10 +8,11 @@ import { emptyState, newBook, uid, type AppState, type Book, type Publication, t
 import styles from './PublicShelf.module.css';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { copyShelfItems } from '@/lib/shelf-actions';
+import { normalizeCatalogId } from '@/lib/book-catalog';
 
 class SignInRequired extends Error {}
-const sameBook=(book:Book,other:PublicBook)=>book.title.trim().toLocaleLowerCase()===other.title.trim().toLocaleLowerCase()&&book.author.trim().toLocaleLowerCase()===other.author.trim().toLocaleLowerCase();
-const importBook=(book:PublicBook):Book=>({...newBook(book.title,book.author),coverUrl:book.coverUrl,color:book.color, ...(book.pages!==undefined?{pages:book.pages}:{}), ...(book.format?{format:book.format}:{}), ...(book.dimensions?{dimensions:{...book.dimensions}}:{}), ...(book.spineUrl?{spineUrl:book.spineUrl}:{})});
+const sameBook=(book:Book,other:PublicBook)=>!(book.catalogId&&other.catalogId&&book.catalogId!==other.catalogId)&&!(book.editionId&&other.editionId&&book.editionId!==other.editionId)&&book.title.trim().toLocaleLowerCase()===other.title.trim().toLocaleLowerCase()&&book.author.trim().toLocaleLowerCase()===other.author.trim().toLocaleLowerCase();
+const importBook=(book:PublicBook):Book=>({...newBook(book.title,book.author),coverUrl:book.coverUrl,color:book.color, ...(book.catalogId?{catalogId:book.catalogId}:{}), ...(book.editionId?{editionId:book.editionId}:{}), ...(book.pages!==undefined?{pages:book.pages}:{}), ...(book.format?{format:book.format}:{}), ...(book.dimensions?{dimensions:{...book.dimensions}}:{}), ...(book.spineUrl?{spineUrl:book.spineUrl}:{})});
 
 function PublicCover({book,detail=false}:{book:PublicBook;detail?:boolean}) {
   const [failed,setFailed]=useState(false);
@@ -148,6 +149,7 @@ export default function PublicShelf({id}:{id:string}) {
         <PublicCover key={selected.id} book={selected} detail/>
         <h2 id="public-book-title">{selected.title}</h2><p className={styles.author}>{selected.author}</p>
         <p className={styles.detailNote}>Save this title to your library, then find a place for it on your own shelf.</p>
+        <a className={styles.primary} href={normalizeCatalogId(selected.catalogId)?'/books/'+selected.catalogId:'/books?q='+encodeURIComponent(selected.title+' '+selected.author)}>Book page & editions <span aria-hidden="true">↗</span></a>
         <button type="button" className={styles.primary} onClick={()=>saveBook(selected)} disabled={busy}>{busy?'Saving…':'+ Add to my library'}</button>
         {notice?<p className={styles.dialogNotice} role="status">{notice}</p>:null}
         {needsSignIn?<div className={styles.dialogNotice}><p>Sign in to save this book.</p><a href={signInUrl}>Sign in to cybershelf ↗</a></div>:null}

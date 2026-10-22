@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runIntegration } from '../lib/server/integration.test.mjs';
 import { runReadingRoomIntegration } from '../lib/server/reading-room.integration.mjs';
+import { runBookCommunityIntegration } from '../lib/server/book-community.integration.mjs';
 
 // Reuse Wrangler's pinned Miniflare without adding a second runtime version.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -78,8 +79,15 @@ try {
   assert.equal(signIn.status, 200, 'Standalone sign-in page renders in workerd');
   assert.match(await signIn.text(), /email/i);
   console.log('✓ Guest home and sign-in render from the production Worker bundle.');
+  const catalog = await requestFetch(base + '/books');
+  assert.equal(catalog.status, 200, 'Public catalog renders in workerd');
+  assert.match(await catalog.text(), /aria-label="Search the book catalog"/);
+  const missingBook = await requestFetch(base + '/books/cs_' + '0'.repeat(64));
+  assert.equal(missingBook.status, 404, 'An unknown community work returns a real page 404');
+  console.log('✓ Public catalog and missing-book status render from the production Worker bundle.');
   await runIntegration({ base, fetch: requestFetch, report: message => console.log('✓ ' + message) });
   await runReadingRoomIntegration({ base, fetch: requestFetch, database, report: message => console.log('✓ ' + message) });
+  await runBookCommunityIntegration({ base, fetch: requestFetch, database, report: message => console.log('✓ ' + message) });
   const hashes = await database.prepare('SELECT password FROM auth_account').all();
   assert.ok(hashes.results.length >= 2);
   for (const row of hashes.results) {

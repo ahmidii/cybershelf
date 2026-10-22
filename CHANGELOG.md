@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.5.0 — A page for every book — 2026-10-22
+
+### Added
+
+- Public book pages and catalog search, with work-level descriptions, authors, subjects, available editions, and shareable links. Edition cards show ISBN, page count, language, format, publisher, and publication date when available.
+- Private Add to library actions from a work or a chosen edition. Edition selection preserves notes and reading history, and keeps different known editions separate.
+- Cybershelf community average ratings, rating counts, completed-read totals, and unique reader counts. Readers explicitly contribute a half-star rating or dated completed read, and can remove either.
+- Completed-read aggregation across editions of an identified work. A live, explicitly shared 100% journal entry contributes at most one completion per reader, without adding a duplicate to that reader's separately logged reads. Private library records never enter the aggregation.
+- Conservative ISBN and exact title/author resolution for existing books, explicit choices for ambiguous matches, and an explicit title/author-only community page for books absent from the catalog.
+- Book page links from search results, private book details, public shelves, and public profiles. Catalog and edition identities survive saved libraries, snapshots, and backups.
+- D1 migration `0006_book_community` for minimal community catalog records, public contribution records, and the shared-post work index. The deployment reuses existing resources.
+
+### Changed
+
+- Combined Reading together and Reading journal into one main destination, with one page/percentage-and-thought composer and Your circle / Your journal views for the selected book.
+- Private saves open the journal; explicitly shared entries open the circle. History editing, deletion, sharing, and unsharing remain available.
+- Work search no longer assigns an arbitrary edition ISBN or median page count. Those fields come from a chosen edition or the reader's own entry.
+- Open Library requests use bounded caching, in-flight deduplication, same-host redirect checks, response limits, and a per-isolate courtesy queue.
+
+### Boundaries
+
+- Community statistics are Cybershelf contributions, with honest empty states. They do not import Goodreads ratings or infer all reads from private libraries.
+- Catalog coverage can be incomplete. Manually created pages do not fabricate editions, and legacy posts without a reliable work identity are not guessed into an Open Library work's totals.
+- Goodreads remains CSV import; Hardcover authorization still requires owner activation. No Amazon account connection is included, and manual reading logs do not require device or progress synchronization.
+- Private library ratings and public community ratings remain separate. Catalog backups do not recreate public contributions or sharing permissions.
+
 ## 0.4.0 — Reading together, connected books — 2026-10-22
 
 ### Added

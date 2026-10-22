@@ -36,16 +36,16 @@ export async function POST(request:Request){return handled(async()=>{
   await reserveReadingAction(user.userId,'post');
   let snapshot=makeReadingSnapshot(book,entry,id,imageIds);
   if(!existing){
-    const inserted=await db.prepare('INSERT INTO reading_posts (id,owner_id,profile_id,book_id,entry_id,snapshot,image_ids,published_at,updated_at,book_key) SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM libraries WHERE owner_id = ? AND version = ?) AND EXISTS (SELECT 1 FROM public_profiles WHERE id = ? AND owner_id = ?) AND (SELECT COUNT(*) FROM reading_posts WHERE owner_id = ?) < 2000 ON CONFLICT(owner_id,entry_id) DO NOTHING')
-      .bind(id,user.userId,profile.id,book.id,entry.id,JSON.stringify(snapshot),JSON.stringify([...imageIds]),now,now,readingBookKey(book),user.userId,library.version,profile.id,user.userId,user.userId).run();
+    const inserted=await db.prepare('INSERT INTO reading_posts (id,owner_id,profile_id,book_id,entry_id,snapshot,image_ids,published_at,updated_at,book_key,catalog_id) SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM libraries WHERE owner_id = ? AND version = ?) AND EXISTS (SELECT 1 FROM public_profiles WHERE id = ? AND owner_id = ?) AND (SELECT COUNT(*) FROM reading_posts WHERE owner_id = ?) < 2000 ON CONFLICT(owner_id,entry_id) DO NOTHING')
+      .bind(id,user.userId,profile.id,book.id,entry.id,JSON.stringify(snapshot),JSON.stringify([...imageIds]),now,now,readingBookKey(book),book.catalogId??null,user.userId,library.version,profile.id,user.userId,user.userId).run();
     if(inserted.meta.changes){const row=await getPublicReadingPost(id);if(!row)throw new HttpError(409,'Your profile was made private while sharing.');return json({post:readingPostDto(row)},201);}
     existing=await db.prepare('SELECT * FROM reading_posts WHERE owner_id = ? AND entry_id = ?').bind(user.userId,entry.id).first<ReadingPostRow>();
     if(!existing)throw new HttpError(409,'Your Library or profile changed while sharing, or you have reached 2,000 shared entries. Review your saved entries and try again.');
     id=existing.id;snapshot=makeReadingSnapshot(book,entry,id,imageIds);
   }
   const publishedAt=existing.profile_id===profile.id?existing.published_at:now;
-  const updated=await db.prepare('UPDATE reading_posts SET profile_id = ?, book_id = ?, snapshot = ?, image_ids = ?, published_at = ?, updated_at = ?, book_key = ? WHERE id = ? AND owner_id = ? AND EXISTS (SELECT 1 FROM libraries WHERE owner_id = ? AND version = ?) AND EXISTS (SELECT 1 FROM public_profiles WHERE id = ? AND owner_id = ?)')
-    .bind(profile.id,book.id,JSON.stringify(snapshot),JSON.stringify([...imageIds]),publishedAt,now,readingBookKey(book),id,user.userId,user.userId,library.version,profile.id,user.userId).run();
+  const updated=await db.prepare('UPDATE reading_posts SET profile_id = ?, book_id = ?, snapshot = ?, image_ids = ?, published_at = ?, updated_at = ?, book_key = ?, catalog_id = ? WHERE id = ? AND owner_id = ? AND EXISTS (SELECT 1 FROM libraries WHERE owner_id = ? AND version = ?) AND EXISTS (SELECT 1 FROM public_profiles WHERE id = ? AND owner_id = ?)')
+    .bind(profile.id,book.id,JSON.stringify(snapshot),JSON.stringify([...imageIds]),publishedAt,now,readingBookKey(book),book.catalogId??null,id,user.userId,user.userId,library.version,profile.id,user.userId).run();
   if(!updated.meta.changes)throw new HttpError(409,'Your Library or profile changed while sharing. Save your changes and try again.');
   const row=await getPublicReadingPost(id);if(!row)throw new HttpError(409,'Your profile was made private while sharing.');
   return json({post:readingPostDto(row)});

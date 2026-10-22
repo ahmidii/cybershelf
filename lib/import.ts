@@ -1,6 +1,7 @@
 import { newBook, shelfCapacity, shelfGrid, shelfPlacementError, uid } from './types';
 import type { AppState, Book, BookSource, ImportedBookFields, LibraryConnection, ReadingLogEntry, ReadingStatus, Shelf, ShelfItem } from './types';
 import { validBookDimensions } from './book-size';
+import { normalizeCatalogId, normalizeOpenLibraryEditionId } from './book-catalog';
 
 const MAX_CSV_BYTES = 10 * 1024 * 1024;
 const MAX_STATE_BYTES = 2 * 1024 * 1024;
@@ -112,6 +113,17 @@ export function parseGoodreadsCSV(text: string): { books: Book[]; warnings: stri
     if (!title) { skipped++; continue; }
     const author = clip(get('author') || get('authors') || 'Unknown author', 500);
     const book = newBook(title, author);
+    const catalogId=get('catalog id'),editionId=get('edition id');
+    if(catalogId){
+      const valid=normalizeCatalogId(catalogId);
+      if(valid)book.catalogId=valid;
+      else warnings.push(`“${title}”: an invalid catalog identity was skipped.`);
+    }
+    if(editionId){
+      const valid=normalizeOpenLibraryEditionId(editionId);
+      if(valid&&book.catalogId?.startsWith('OL'))book.editionId=valid;
+      else warnings.push(`“${title}”: an invalid or unlinked edition identity was skipped.`);
+    }
     book.isbn = normalizeISBN(get('isbn13')) ?? normalizeISBN(get('isbn'));
     book.color = bookColor(title + author);
     const status = get('exclusive shelf').toLowerCase();
@@ -158,25 +170,26 @@ function titleKey(book: Book): string {
   return `${normalize(book.title)}\u0000${normalize(book.author)}`;
 }
 
+function importedBookIndex(books: Book[], incoming: Book): number {
+  const compatible=(book:Book)=>(!book.catalogId||!incoming.catalogId||book.catalogId===incoming.catalogId)&&
+    (!book.editionId||!incoming.editionId||book.editionId===incoming.editionId);
+  const edition=incoming.editionId?books.findIndex(book=>compatible(book)&&book.editionId===incoming.editionId):-1;
+  if(edition>=0)return edition;
+  const isbn=normalizeISBN(incoming.isbn??''),key=titleKey(incoming);
+  const matchingISBN=isbn?books.findIndex(book=>compatible(book)&&normalizeISBN(book.isbn??'')===isbn):-1;
+  return matchingISBN>=0?matchingISBN:books.findIndex(book=>compatible(book)&&titleKey(book)===key&&(!isbn||!normalizeISBN(book.isbn??'')));
+}
+
 /** Existing records win. Re-importing cannot replace reviews, notes, or links. */
 export function mergeBooks(existing: Book[], incoming: Book[]): { books: Book[]; added: number; duplicates: number } {
-  const books = [...existing], isbns = new Set<string>(), titleEditions = new Map<string, Set<string>>();
+  const books = [...existing];
   const readingIds = new Set(existing.flatMap(book => book.readingLog?.map(entry => entry.id) ?? []));
-  const index = (book: Book) => {
-    const isbn = normalizeISBN(book.isbn ?? '') ?? '';
-    if (isbn) isbns.add(isbn);
-    const key = titleKey(book);
-    const editions = titleEditions.get(key) ?? new Set<string>();
-    editions.add(isbn); titleEditions.set(key, editions);
-  };
-  existing.forEach(index);
   let duplicates = 0, added = 0;
   for (const book of incoming) {
-    const isbn = normalizeISBN(book.isbn ?? '') ?? '', editions = titleEditions.get(titleKey(book));
-    if ((isbn && isbns.has(isbn)) || (editions && (!isbn || editions.has('')))) { duplicates++; continue; }
+    if (importedBookIndex(books,book)>=0) { duplicates++; continue; }
     if (books.length >= MAX_BOOKS) throw new Error('Your library can hold 2,000 books in this release. Remove books or import a smaller selection.');
     const imported = withUniqueReadingIds(book, readingIds);
-    books.push(imported); index(imported); added++;
+    books.push(imported); added++;
   }
   return { books, added, duplicates };
 }
@@ -188,9 +201,7 @@ export function mergeImportedBooks(existing: Book[], incoming: Book[]): { books:
   const readingIds = new Set(existing.flatMap(book => book.readingLog?.map(entry => entry.id) ?? []));
   let added = 0, duplicates = 0, attached = 0;
   for (const imported of incoming) {
-    const isbn = normalizeISBN(imported.isbn ?? '') ?? '', key = titleKey(imported);
-    const matchingISBN = isbn ? books.findIndex(book => normalizeISBN(book.isbn ?? '') === isbn) : -1;
-    const matchingIndex = matchingISBN >= 0 ? matchingISBN : books.findIndex(book => titleKey(book) === key && (!isbn || !normalizeISBN(book.isbn ?? '')));
+    const matchingIndex = importedBookIndex(books,imported);
     if (matchingIndex < 0) {
       if (books.length >= MAX_BOOKS) throw new Error('Your library can hold 2,000 books in this release. Remove books or import a smaller selection.');
       books.push(withUniqueReadingIds(imported, readingIds)); added++; continue;
@@ -340,6 +351,16 @@ export function parseCatalogJSON(text: string): AppState {
       addedAt: date(data.addedAt, `${context} added date`), sources,
     };
     if (!book.title.trim()) throw new Error(`Invalid backup: ${context} has no title.`);
+    if(data.catalogId!==undefined){
+      const value=normalizeCatalogId(data.catalogId);
+      if(!value||value!==data.catalogId)throw new Error(`Invalid backup: ${context} has an invalid catalog identity.`);
+      book.catalogId=value;
+    }
+    if(data.editionId!==undefined){
+      const value=normalizeOpenLibraryEditionId(data.editionId);
+      if(!value||value!==data.editionId||!book.catalogId?.startsWith('OL'))throw new Error(`Invalid backup: ${context} has an invalid or unlinked edition identity.`);
+      book.editionId=value;
+    }
     if (data.isbn !== undefined) book.isbn = string(data.isbn, `${context} ISBN`, 32);
     if (data.description !== undefined) book.description = string(data.description, `${context} description`, 10000);
     if (data.readingLog !== undefined) book.readingLog = parseReadingLog(data.readingLog, `${context} reading log`);

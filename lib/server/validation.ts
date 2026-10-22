@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { shelfCapacity, shelfPlacementError, type AppState, type Book, type Publication, type PublicProfile, type ReadingLogEntry } from '../types';
 
 export const idSchema = z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
+const catalogIdSchema = z.string().regex(/^(?:OL[1-9]\d{0,11}W|cs_[a-f0-9]{64})$/);
+const editionIdSchema = z.string().regex(/^OL[1-9]\d{0,11}M$/);
 const text = (max: number) => z.string().max(max);
 const date = z.string().max(40).refine(v => Number.isFinite(Date.parse(v)), 'Invalid date');
 const url = z.string().max(2048).refine(v => {
@@ -23,6 +25,7 @@ const bookConnection=z.object({connectionId:idSchema,remoteId:idSchema,sourceId:
 const libraryConnection=z.object({id:idSchema,provider:z.literal('hardcover'),accountKey:z.string().regex(/^[a-f0-9]{64}$/),label:z.string().min(1).max(80),autoSync:z.boolean(),syncProgress:z.boolean(),connectedAt:date,lastSyncedAt:date.optional(),lastSummary:z.object({added:z.number().int().min(0).max(2000),updated:z.number().int().min(0).max(2000),preserved:z.number().int().min(0).max(2000)}).optional()});
 const book = z.object({
   id: idSchema, title: z.string().min(1).max(500), author: text(500), coverUrl: imageUrl,
+  catalogId:catalogIdSchema.optional(),editionId:editionIdSchema.optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/), isbn: text(32).optional(), description: text(10000).optional(),
   pages: z.number().int().min(0).max(100000).optional(), status: z.enum(['unread','reading','read','paused','dnf']),
   format: z.enum(['paperback','hardcover','pocket','large']).optional(), spineUrl: imageUrl.optional(),
@@ -31,6 +34,8 @@ const book = z.object({
   progress: z.number().min(0).max(100), rating: z.number().min(0).max(5).nullable(),
   review: text(20000), notes: text(30000), addedAt: date, finishedAt: date.optional(), sources: z.array(source).max(30),
   connections:z.array(bookConnection).max(20).optional(),
+}).superRefine((book,ctx)=>{
+  if(book.editionId&&!book.catalogId?.startsWith('OL'))ctx.addIssue({code:z.ZodIssueCode.custom,message:'A selected edition needs its Open Library work.',path:['editionId']});
 });
 const item = z.object({
   id:idSchema, kind:z.enum(['book','decor']), bookId:idSchema.optional(), decor:z.enum(['plant','bear','robot','vase','bookend','image']).optional(),
@@ -118,6 +123,7 @@ function publicArtwork(value:string,id:string,imageIds:Set<string>,surface:Share
 }
 function publicBook(book:Book,id:string,imageIds:Set<string>,surface:ShareSurface){
   return {id:book.id,title:book.title,author:book.author,coverUrl:publicArtwork(book.coverUrl,id,imageIds,surface),color:book.color,
+    ...(book.catalogId?{catalogId:book.catalogId}:{}),...(book.editionId?{editionId:book.editionId}:{}),
     ...(book.pages===undefined?{}:{pages:book.pages}),...(book.format?{format:book.format}:{}),
     ...(book.spineUrl?{spineUrl:publicArtwork(book.spineUrl,id,imageIds,surface)}:{}),
     ...(book.dimensions?{dimensions:{heightMm:book.dimensions.heightMm,widthMm:book.dimensions.widthMm,thicknessMm:book.dimensions.thicknessMm,source:book.dimensions.source}}:{})};

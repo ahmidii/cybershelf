@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes version 0.2 as implemented. The app runs on Vinext/React with a Cloudflare Worker, a D1 database, and an R2 bucket. Better Auth supplies email/password authentication and database-backed sessions on the standalone Cloudflare deployment.
+This document describes version 0.5 as implemented. The app runs on Vinext/React with a Cloudflare Worker, a D1 database, and an R2 bucket. Better Auth supplies email/password authentication and database-backed sessions on the standalone Cloudflare deployment.
 
 ## Product model
 
@@ -8,6 +8,9 @@ This document describes version 0.2 as implemented. The app runs on Vinext/React
 | --- | --- |
 | Library | The account's catalog. Entries do not assert ownership. |
 | Book | Metadata, reading state, personal writing, and optional sources. |
+| Catalog work | A public work identity shared by its editions; it is independent of a private library book ID. |
+| Catalog edition | A selected publishing edition with its own identifier and available ISBN/page count. |
+| Community contribution | An explicitly shared rating or dated completed read, separate from private reading records. |
 | Source | An uploaded original, reading-platform link, other link, or physical location. |
 | Shelf | A named arrangement referencing library book IDs and decorative objects. |
 | Placement | One book or decoration with a row, normalized horizontal center, and optional supporting item; the legacy `slot: null` marker identifies the staging tray. |
@@ -39,14 +42,16 @@ Sorting uses the positions of movable books already on the shelf. A continuous p
 | Area | Responsibility |
 | --- | --- |
 | `app/page.tsx` | Request identity and the application entry point. |
-| `components/CybershelfApp.tsx` | Library, shelves, journal, Following, Explore, profiles, and editing flows. |
+| `components/CybershelfApp.tsx` | Library, shelves, Reading together, Following, Explore, profiles, and editing flows. |
+| `components/BookDirectory.tsx` / `PublicBook.tsx` | Public catalog search, work/edition pages, private library additions, and explicit community contributions. |
+| `components/LibraryBookPageLink.tsx` | Conservative matching or explicit minimal community-page creation for an existing private book. |
 | `components/ShelfCanvas.tsx` | Responsive shelf rendering and item interaction. |
 | `components/DecorArt.tsx` | Built-in SVG decorative objects. |
 | `components/AddBooks.tsx` | Metadata lookup, import previews, and uploaded-file intake. |
 | `components/BookDetails.tsx` | Sources, reading records, metadata, and book removal. |
 | `components/PublicShelf.tsx` | Shared shelf display, saving a title, and copying an arrangement. |
 | `components/ProfileView.tsx` / `PublicProfile.tsx` | Private profile preview/publication and public reader page. |
-| `components/ReadingJournal.tsx` / `ReadingThread.tsx` | Private reading entries and explicitly shared conversations. |
+| `components/ReadingRoom.tsx` / `ReadingJournal.tsx` / `ReadingThread.tsx` | Unified composer, selected-book private history, and explicitly shared conversations. |
 | `components/FollowingFeed.tsx` / `SpoilerText.tsx` | Following activity, explicit acquisition shares, and accessible spoiler hiding. |
 | `lib/use-library.ts` | Account loading, autosave, version conflicts, and guest drafts. |
 | `lib/import.ts` / `lib/export.ts` | Bounded imports, backups, originals, and CSV handling. |
@@ -71,6 +76,9 @@ Application data is split between private state and deliberate public snapshots:
 | `reading_events` | Retained rolling posting counters so removing a post/reply cannot reset its limit. |
 | `follows` | Follower/owner relationships and the last public profile ID. |
 | `reader_activity` | Explicit purchased/added announcements containing allowlisted book metadata. |
+| `community_books` | Explicit community work records containing only a public title and author. |
+| `book_ratings` | One explicit half-star community rating per owner/work, with deletion cascades. |
+| `book_reads` | Explicit completed-read dates, unique per owner/work/day and bounded per owner/work. |
 
 Better Auth additionally owns `auth_user`, `auth_session`, `auth_account`, `auth_verification`, and `auth_rate_limit`. Password hashes and session tokens stay server-side. The verification table is reserved for the maintained authentication schema; no email delivery or account-recovery flow is configured in this release.
 
@@ -93,6 +101,14 @@ Anonymous edits use a clearly labelled browser-local draft. They are not synchro
 | `DELETE /api/assets/[id]` | Asset owner only: removal subject to reference checks. |
 | `GET /api/search?q=...` | Bounded metadata search backed by Open Library. |
 | `GET /api/book-details?isbn=...` | Cached, bounded edition appearance lookup for a valid ISBN. |
+| `GET /api/books/[bookId]?offset=...` | Public work metadata and a page of available editions. |
+| `GET /api/books/resolve?isbn=...&title=...&author=...` | Uncached conservative identity resolution, with candidates when ambiguous. |
+| `POST /api/books/register` | Owner: explicitly create a title/author-only community page from a saved library book. |
+| `GET /api/books/[bookId]/community` | Public aggregate ratings, reads, and unique reader counts. |
+| `GET /api/books/[bookId]/community/me` | Owner: their own contributions and live shared-completion status. |
+| `PUT /api/books/[bookId]/community/rating` | Owner: explicitly set or remove their community rating. |
+| `POST /api/books/[bookId]/community/reads` | Owner: idempotently log a dated completed read. |
+| `DELETE /api/books/[bookId]/community/reads/[id]` | Owner: remove their completed-read contribution. |
 | `GET /api/connections/config` | Signed-in owner: provider availability and optional public application ID; no credentials. |
 | `GET /api/reading-room?bookId=...` | Signed-in reader: own/followed shared entries through the selected saved bookmark, ordered and paginated. |
 | `GET/POST /api/reading-room/[postId]/comments?bookId=...` | Signed-in reader: protected replies and bounded reply creation within the selected bookmark. |
@@ -193,3 +209,17 @@ The room UI clears stale views when permission checks fail and expires expanded 
 Hardcover credentials live only in an opaque browser session. Pending OAuth state/verifier is account-bound and short-lived; token exchange, library calls, refresh rotation, and revocation never pass through Cybershelf. The callback has `Referrer-Policy: no-referrer` and `Cache-Control: private, no-store`. The optional public client ID is read from Worker runtime configuration.
 
 Connection sync applies an explicit field allowlist, with the last accepted values used as a three-way baseline. Local edits win conflicts; reading status and progress move together only when enabled and sufficiently specified. Removing a provider record never removes the local book. Imported metadata, preferences, and matching fingerprints are stored in D1; provider credentials are not. This protects credential handling in the current implementation, not against operator-readable metadata or altered future JavaScript. See [account connections](account-connections.md) for exact setup and the threat boundary.
+
+## Public book pages and unified reading in v0.5
+
+`Book.id` remains a private library item ID. Optional `catalogId` identifies a public work (`OL…W` or `cs_` plus a SHA-256 digest), and `editionId` identifies an explicitly chosen Open Library edition (`OL…M`). These fields are validated and allowlisted in backups and public snapshots. They contain no account identity. Work search supplies work metadata only; ISBN and page count belong to an edition and are not borrowed from an arbitrary search result.
+
+`lib/server/book-catalog.ts` retrieves work and author metadata and editions in pages of 24. Its cache is bounded to 8 MB, JSON responses to 2 MB, and requests to approved Open Library JSON paths. Same-host redirects, in-flight deduplication, timeouts, and a bounded courtesy queue prevent uncontrolled upstream fan-out. The one-request-per-second queue is per Worker isolate, not a distributed global rate limiter. Public catalog responses have cache headers; identity resolution uses `no-store` because query text can come from a private book. Resolution checks a supplied ISBN against the returned edition and accepts a title/author match automatically only when it is unique, exact after normalization, and from a complete result set.
+
+When a reader explicitly creates a community page, the server resolves the submitted book ID from that reader's saved library and stores only title and author. Its stable identity derives from the conservative normalized title/author key. The registration response does not automatically rewrite private library state; the client saves the association through the normal versioned library flow. Manual pages and Open Library works are not merged by fuzzy matching.
+
+Community ratings and read logs use separate tables with account foreign keys. A rating is null or 0.5–5 in half-star steps. Read logs use client-generated idempotency IDs and validated calendar dates, with atomic uniqueness per owner/work/date. SQL limits bound contributions per account and book. Deletes are owner-scoped and idempotent; stale-account headers and origin checks apply to mutations.
+
+Aggregates never query private library contents. Per work, each reader contributes their explicit completed-read count, or one completion if they have a currently visible 100% reading post and no explicit completed-read logs. Repeated completion posts do not multiply reads; distinct explicit dates can represent rereads. Public post contributions require the current public profile, so unsharing or unpublishing revokes them. Explicit ratings/read logs have their own removal controls. Public statistics expose only aggregates, not contributing account IDs. Legacy posts with no established work identity are never fuzzily attributed to an Open Library work; exact manual-title/author fallback remains separate.
+
+Reading together is the only main reading destination. One composer records the marker when the reader chooses to save an update; neither a connected retailer nor live device tracking is required. Your circle uses the protected room API; Your journal embeds only the selected book's private/shared history without another composer. Private saves and shared saves choose the corresponding view. Existing private review/rating fields stay in Book details and do not become public contributions.

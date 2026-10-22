@@ -9,6 +9,7 @@ import { appendReadingEntry, makeReadingEntry, readingMarker, READING_THOUGHT_LI
 import { readingBookKey, readingDate } from '@/lib/reading';
 import type { ReadingRoomCommentsResponse, ReadingRoomOrder, ReadingRoomResponse } from '@/lib/reading-room';
 import BookCover from './BookCover';
+import ReadingJournal from './ReadingJournal';
 import styles from './ReadingRoom.module.css';
 
 interface Props {
@@ -54,9 +55,9 @@ export default function ReadingRoom(props: Props) {
   useEffect(() => { if (initialBookId) setBookId(initialBookId); }, [initialBookId]);
 
   return <section className={styles.room} aria-label="Reading together">
-    <header className="page-heading"><div><p className="eyebrow">SAME STORY, YOUR OWN PACE</p><h1>Reading together<span className="title-period">.</span></h1><p className="page-description">The people you follow, in the margins of your book. Their thoughts meet you where you are.</p></div></header>
+    <header className="page-heading"><div><p className="eyebrow">SAME STORY, YOUR OWN PACE</p><h1>Reading together<span className="title-period">.</span></h1><p className="page-description">Keep your place, collect your thoughts, and find your people in the same story.</p></div></header>
     {selected ? <>
-      <div className={styles.chooseBook}><BookOpen size={19} strokeWidth={1.5}/><label><span>Open a conversation</span><select aria-label="Book to read together" value={selected.id} onChange={event => setBookId(event.target.value)}>{books.map(book => <option key={book.id} value={book.id}>{book.title} — {book.author}</option>)}</select></label><span className={styles.circleTag}><UsersRound size={14}/>Your reading circle</span></div>
+      <div className={styles.chooseBook}><BookOpen size={19} strokeWidth={1.5}/><label><span>What are you reading?</span><select aria-label="Book to read together" value={selected.id} onChange={event => setBookId(event.target.value)}>{books.map(book => <option key={book.id} value={book.id}>{book.title} — {book.author}</option>)}</select></label><span className={styles.circleTag}><UsersRound size={14}/>Your reading circle</span></div>
       <BookRoom key={`${props.accountId ?? 'guest'}:${selected.id}:${readingBookKey(selected)}`} {...props} book={selected}/>
     </> : <div className={styles.empty}><BookOpen size={34} strokeWidth={1.2}/><h2>Every book is a place to meet.</h2><p>Add a book to your library, then open it here. Your circle’s shared thoughts will gather around the same story.</p><button type="button" className="button secondary" onClick={onExplore}>Explore shelves<ArrowUpRight size={14}/></button></div>}
   </section>;
@@ -65,12 +66,15 @@ export default function ReadingRoom(props: Props) {
 function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, onOpenProfile, onExplore, notify }: Props & { book: Book }) {
   const progress = bookProgress(book);
   const [order, setOrder] = useState<ReadingRoomOrder>('position');
+  const [readingView, setReadingView] = useState<'circle' | 'journal'>('circle');
   const [room, setRoom] = useState<ReadingRoomResponse | null>(null);
   const [loading, setLoading] = useState(false), [loadingMore, setLoadingMore] = useState(false), [loadError, setLoadError] = useState('');
   const [refreshTick, setRefreshTick] = useState(0);
   const [mode, setMode] = useState<'page' | 'percent'>(book.pages ? 'page' : 'percent');
   const [marker, setMarker] = useState(String(book.pages ? Math.round(book.pages * progress / 100) : percentage(progress)));
-  const [saving, setSaving] = useState(false), [saveError, setSaveError] = useState('');
+  const [manualProgress, setManualProgress] = useState(String(percentage(progress)));
+  const [saving, setSaving] = useState(false);
+  const markerEdited = useRef(false), modeRef = useRef(mode); modeRef.current = mode;
   const [body, setBody] = useState(''), [posting, setPosting] = useState(false), [postError, setPostError] = useState('');
   const [pendingEntry, setPendingEntry] = useState<string | null>(null), [profileNeeded, setProfileNeeded] = useState(false);
   const active = useRef(true), serial = useRef(0), request = useRef<AbortController | null>(null);
@@ -80,8 +84,24 @@ function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, on
   const shown = ready ? room?.items.filter(post => post.entry.progress <= protectedProgress) ?? [] : [];
 
   useEffect(() => { active.current = true; return () => { active.current = false; serial.current++; request.current?.abort(); }; }, []);
-  useEffect(() => { setMarker(String(mode === 'page' && book.pages ? Math.round(book.pages * progress / 100) : percentage(progress))); }, [progress, book.pages, mode]);
-  useEffect(() => { if (!book.pages) setMode('percent'); }, [book.pages]);
+  useEffect(() => {
+    if (markerEdited.current) return;
+    setMarker(String(modeRef.current === 'page' && book.pages ? Math.round(book.pages * progress / 100) : modeRef.current === 'page' ? 0 : percentage(progress)));
+    setManualProgress(String(percentage(progress)));
+  }, [progress, book.pages]);
+  useEffect(() => {
+    if (pendingEntry && !book.readingLog?.some(entry => entry.id === pendingEntry)) { setPendingEntry(null); setProfileNeeded(false); }
+  }, [book.readingLog, pendingEntry]);
+
+  const changeMode = (next: 'page' | 'percent') => {
+    if (next === mode) return;
+    const entered = Number(mode === 'page' && !book.pages ? manualProgress : marker);
+    const converted = mode === 'page' && book.pages ? entered / book.pages * 100 : entered;
+    const value = Number.isFinite(converted) && converted >= 0 && converted <= 100 ? converted : progress;
+    setManualProgress(String(percentage(value)));
+    setMarker(next === 'page' ? book.pages ? String(Math.round(book.pages * value / 100)) : '' : String(percentage(value)));
+    setMode(next);
+  };
 
   const refresh = useCallback(async (quiet = false) => {
     if (!accountId || !current.current.ready) return;
@@ -141,61 +161,45 @@ function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, on
     finally { if (active.current) setLoadingMore(false); }
   };
 
-  const saveBookmark = async (event: React.FormEvent) => {
-    event.preventDefault(); if (!ready || saving || posting) return;
-    setSaveError('');
-    try {
-      const value = Number(marker), maximum = mode === 'page' ? book.pages ?? 0 : 100;
-      if (!marker.trim() || !Number.isFinite(value) || value < 0 || value > maximum || mode === 'page' && !Number.isInteger(value)) throw new Error(`Choose ${mode === 'page' ? 'a whole page' : 'a percentage'} between 0 and ${maximum.toLocaleString()}.`);
-      const nextProgress = mode === 'page' ? value / maximum * 100 : percentage(value);
-      setSaving(true); setRoom(null);
-      update(library => ({ ...library, books: library.books.map(item => item.id !== book.id ? item : {
-        ...item, progress: nextProgress,
-        status: nextProgress === 100 ? 'read' : nextProgress === 0 ? 'unread' : 'reading',
-        finishedAt: nextProgress === 100 ? item.finishedAt ?? new Date().toISOString() : undefined,
-      }) }));
-      await flush();
-      if (!active.current) return;
-      notify(accountId ? 'Bookmark saved. Your conversation now follows your place.' : 'Bookmark saved in your browser draft.');
-      await refresh();
-    } catch (reason) { if (active.current) setSaveError(reason instanceof Error ? reason.message : 'Your bookmark could not be saved.'); }
-    finally { if (active.current) setSaving(false); }
-  };
-
   const publishEntry = async (entryId: string) => {
     if (!accountId) return;
     const sharing = await roomRequest<{ profileId?: string }>('/api/journal', accountId);
     if (!active.current) return;
-    if (!sharing.profileId) { setProfileNeeded(true); return; }
+    if (!sharing.profileId) { setProfileNeeded(true); setReadingView('journal'); return; }
     await roomRequest('/api/journal', accountId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookId: book.id, entryId }) });
     if (!active.current) return;
-    setPendingEntry(null); setProfileNeeded(false);
-    notify('Your thought is shared. It will meet other readers at this point.');
+    setPendingEntry(null); setProfileNeeded(false); setReadingView('circle');
+    notify('Your reading update is shared. It will meet others at this point.');
     await refresh(true);
   };
 
   const saveThought = async (share: boolean) => {
-    if (!ready || saving || posting || !body.trim()) return;
-    setPostError(''); setProfileNeeded(false); setPosting(true);
+    if (!ready || saving || posting) return;
+    setPostError(''); setProfileNeeded(false); setSaving(!share); setPosting(share);
     try {
-      const latest = current.current.book, markerProgress = bookProgress(latest);
-      const entry = makeReadingEntry(latest, { body, mode: 'percent', marker: String(markerProgress) }, { id: uid('log_'), createdAt: new Date().toISOString() });
-      // The thought belongs to the exact saved bookmark; display rounding must
-      // never move the reader forward or back when a thought is recorded.
-      entry.progress = markerProgress;
-      if (latest.pages) entry.page = Math.round(latest.pages * markerProgress / 100);
+      const latest = current.current.book;
+      const entry = makeReadingEntry(latest, { body, mode, marker, progress: manualProgress }, { id: uid('log_'), createdAt: new Date().toISOString() });
+      // A thought at the existing bookmark must preserve its exact ceiling.
+      // Display rounding and switching formats must not unlock more story.
+      entry.progress = !markerEdited.current ? bookProgress(latest)
+        : mode === 'page' ? latest.pages ? Number(marker) / latest.pages * 100 : Number(manualProgress)
+        : Number(marker);
       update(library => appendReadingEntry(library, latest.id, entry));
       setPendingEntry(share ? entry.id : null);
       setBody('');
       await flush();
       if (!active.current) return;
+      markerEdited.current = false;
       if (share && accountId) await publishEntry(entry.id);
-      else notify(accountId ? 'Thought saved in your private reading journal.' : 'Thought saved in your private browser draft.');
+      else {
+        setReadingView('journal');
+        notify(accountId ? entry.body ? 'Thought saved privately in your journal.' : 'Reading progress saved privately in your journal.' : 'Reading update saved in your private browser draft.');
+      }
     } catch (reason) { if (active.current) {
       if (reason instanceof RoomRequestError && [401, 403, 404, 409].includes(reason.status)) setRoom(null);
       setPostError(reason instanceof Error ? reason.message : 'Your thought could not be saved.');
     } }
-    finally { if (active.current) setPosting(false); }
+    finally { if (active.current) { setPosting(false); setSaving(false); } }
   };
 
   const retryShare = async () => {
@@ -215,26 +219,29 @@ function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, on
         <button type="button" className={styles.bookIdentity} onClick={() => onBookOpen(book.id)}><BookCover book={book}/><span><span className={styles.overline}>IN YOUR HANDS</span><strong>{book.title}</strong><small>{book.author}</small><span className={styles.detailsLink}>Book details<ArrowUpRight size={12}/></span></span></button>
         <div className={styles.bookmarkTitle}><Bookmark size={16}/><strong>Your bookmark</strong><span>{percentage(progress)}%</span></div>
         <div className={styles.progressTrack} role="progressbar" aria-label="Your reading progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><span style={{ width: `${progress}%` }}/></div>
-        <form onSubmit={event => void saveBookmark(event)}>
-          <div className={styles.markerControls}><label><span>{mode === 'page' ? 'Page reached' : 'Percentage read'}</span><input aria-label={mode === 'page' ? 'Reading together page reached' : 'Reading together percentage read'} type="number" inputMode={mode === 'page' ? 'numeric' : 'decimal'} min={0} max={mode === 'page' ? book.pages : 100} step={mode === 'page' ? 1 : .1} value={marker} onChange={event => setMarker(event.target.value)} disabled={!ready || saving || posting}/></label><label className={styles.unit}><span className="sr-only">Bookmark format</span><select value={mode} onChange={event => setMode(event.target.value as 'page' | 'percent')} disabled={!ready || saving || posting}>{book.pages ? <option value="page">of {book.pages.toLocaleString()} pages</option> : null}<option value="percent">% read</option></select></label></div>
-          <button className="button secondary" disabled={!ready || saving || posting}>{saving ? <LoaderCircle size={15} className="spin"/> : <Check size={15}/>}Save my place</button>
-        </form>
-        {saveError ? <p className={styles.inlineError} role="alert">{saveError}</p> : null}
-        <p className={styles.bookmarkHelp}>Read a little further, move your bookmark, and more of the conversation opens up.</p>
+        <p className={styles.bookmarkHelp}>Your saved place in this story. Move your bookmark with or without a thought in the update beside it.</p>
       </section>
       <div className={styles.safetyNote}><ShieldCheck size={18}/><div><strong>A conversation at your pace</strong><p>Thoughts and replies beyond your saved bookmark stay out of this view. Different editions are matched by title and author, then compared by percentage; the match is approximate. Protection also depends on readers choosing accurate markers.</p></div></div>
     </aside>
 
     <div className={styles.conversation}>
-      <section className={styles.composer} aria-label="Add a reading thought">
-        <div className={styles.composerTitle}><PenLine size={19}/><div><h2>A thought at this point?</h2><p>At {bookmarkLabel(book, progress)} · {percentage(progress)}% through</p></div></div>
-        <label className={styles.thoughtLabel}><span className="sr-only">Your thought at your current bookmark</span><textarea value={body} onChange={event => setBody(event.target.value)} maxLength={READING_THOUGHT_LIMIT} rows={3} placeholder="A theory, a feeling, a line you’re still thinking about…" disabled={!ready || posting || saving}/></label>
-        <div className={styles.composerActions}><span>{body.length.toLocaleString()} / 4,000</span><div><button type="button" className="button quiet" disabled={!ready || posting || saving || !body.trim()} onClick={() => void saveThought(false)}><LockKeyhole size={14}/>Keep privately</button>{accountId ? <button type="button" className="button primary" disabled={!ready || posting || saving || !body.trim()} onClick={() => void saveThought(true)}>{posting ? <LoaderCircle className="spin" size={14}/> : <Send size={14}/>}Share thought</button> : <a className="button primary" href={signInPath('/')}><ArrowUpRight size={14}/>Sign in to share</a>}</div></div>
-        <p className={styles.privacy}><Globe size={12}/>Sharing publishes this thought, book, bookmark, and date on your profile. Your other notes stay private.</p>
+      <section className={styles.composer} aria-label="Your reading update">
+        <div className={styles.composerTitle}><PenLine size={19}/><div><h2>Leave a little bookmark.</h2><p>A thought is optional. Your place in the book is enough.</p></div></div>
+        <div className={styles.composerMarker}>
+          <label className={styles.markerField}><span>{mode === 'page' ? 'Page reached' : 'Percentage read'}</span><input aria-label={mode === 'page' ? 'Reading together page reached' : 'Reading together percentage read'} type="number" inputMode={mode === 'page' ? 'numeric' : 'decimal'} min={0} max={mode === 'page' ? book.pages || 100000 : 100} step={mode === 'page' ? 1 : .1} value={marker} onChange={event => { markerEdited.current = true; setMarker(event.target.value); }} disabled={!ready || saving || posting}/></label>
+          <label className={styles.markerFormat}><span>Format</span><select value={mode} onChange={event => changeMode(event.target.value as 'page' | 'percent')} disabled={!ready || saving || posting}><option value="page">{book.pages ? `of ${book.pages.toLocaleString()} pages` : 'Page'}</option><option value="percent">% read</option></select></label>
+          {mode === 'page' && !book.pages ? <label className={styles.approximateMarker}><span>Approximately read</span><div><input type="number" aria-label="Approximate percentage at this page" min={0} max={100} step={.1} value={manualProgress} onChange={event => { markerEdited.current = true; setManualProgress(event.target.value); }} disabled={!ready || saving || posting}/><span>%</span></div></label> : null}
+        </div>
+        <p className={styles.markerHelp}>{mode === 'page' ? book.pages ? 'Using your edition’s page count. You can adjust it in Book details.' : 'Add an approximate percentage so the conversation can follow your place across editions.' : 'This marker stays with your update as you continue reading.'}</p>
+        <label className={styles.thoughtLabel}><span className={styles.optionalThought}>Your thought <small>optional</small></span><textarea value={body} onChange={event => setBody(event.target.value)} maxLength={READING_THOUGHT_LIMIT} rows={3} placeholder="A theory, a feeling, a line you’re still thinking about…" disabled={!ready || posting || saving}/></label>
+        <div className={styles.composerActions}><span>{body.length.toLocaleString()} / 4,000</span><div><button type="button" className="button quiet" disabled={!ready || posting || saving} onClick={() => void saveThought(false)}>{saving ? <LoaderCircle className="spin" size={14}/> : <LockKeyhole size={14}/>}{body.trim() ? 'Keep privately' : 'Save my place'}</button>{accountId ? <button type="button" className="button primary" disabled={!ready || posting || saving} onClick={() => void saveThought(true)}>{posting ? <LoaderCircle className="spin" size={14}/> : <Send size={14}/>} {body.trim() ? 'Share thought' : 'Share progress'}</button> : <a className="button primary" href={signInPath('/')}><ArrowUpRight size={14}/>Sign in to share</a>}</div></div>
+        <p className={styles.privacy}><Globe size={12}/>Sharing publishes this update, book, bookmark, and date on your profile. Your other notes stay private.</p>
         {postError ? <p className={styles.inlineError} role="alert">{postError}</p> : null}
-        {pendingEntry ? <div className={styles.pending} role="status"><p><LockKeyhole size={14}/>Your thought is in your private journal.{profileNeeded ? ' Publish a profile to share it with your reading circle.' : ' Share this saved thought when you’re ready.'}</p>{profileNeeded ? <button type="button" className="text-button" onClick={onOpenProfile}>Open my profile<ArrowUpRight size={13}/></button> : <button type="button" className="text-button" onClick={() => void retryShare()} disabled={posting || !ready}>Share saved thought<ArrowUpRight size={13}/></button>}</div> : null}
+        {pendingEntry ? <div className={styles.pending} role="status"><p><LockKeyhole size={14}/>Your reading update is in your private journal.{profileNeeded ? ' Publish a profile to share it with your reading circle.' : ' Share this saved update when you’re ready.'}</p>{profileNeeded ? <button type="button" className="text-button" onClick={onOpenProfile}>Open my profile<ArrowUpRight size={13}/></button> : <button type="button" className="text-button" onClick={() => void retryShare()} disabled={posting || !ready}>Share saved update<ArrowUpRight size={13}/></button>}</div> : null}
       </section>
 
+      <div className={styles.readingViews} role="group" aria-label="Reading view"><button type="button" aria-pressed={readingView === 'circle'} aria-controls="reading-circle-panel" onClick={() => setReadingView('circle')}><UsersRound size={15}/>Your circle{room && <span>{room.totalVisible}</span>}</button><button type="button" aria-pressed={readingView === 'journal'} aria-controls="reading-journal-panel" onClick={() => setReadingView('journal')}><PenLine size={15}/>Your journal<span>{book.readingLog?.length ?? 0}</span></button></div>
+      {readingView === 'journal' ? <div id="reading-journal-panel"><ReadingJournal state={state} update={update} accountId={accountId} ready={ready && !saving && !posting} flush={flush} onBookOpen={onBookOpen} onOpenProfile={onOpenProfile} notify={notify} embeddedBookId={book.id} initialBookId={book.id} refreshKey={refreshTick} onReadTogether={() => setReadingView('circle')} onSharingChanged={published => { setPendingEntry(null); setProfileNeeded(false); if (published) setReadingView('circle'); void refresh(true); }}/></div> : <div id="reading-circle-panel">
       <div className={styles.streamHeading}><div><p className="eyebrow">BETWEEN THE LINES</p><h2>Your circle, in this story.</h2></div>{accountId ? <button type="button" className="icon-button" aria-label="Refresh reading conversation" title="Refresh conversation" onClick={() => void refresh()} disabled={loading || loadingMore || !ready}><RefreshCw size={17} className={loading ? 'spin' : ''}/></button> : null}</div>
       <div className={styles.lens}><span><UsersRound size={14}/>Following & you</span><span><ShieldCheck size={14}/>Through {bookmarkLabel(book, protectedProgress)}</span><label><span className="sr-only">Conversation order</span><select value={order} onChange={event => setOrder(event.target.value as ReadingRoomOrder)}><option value="position">In reading order</option><option value="newest">Newest thoughts</option></select></label></div>
 
@@ -247,6 +254,7 @@ function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, on
         {room && room.waitingCount > 0 && shown.length > 0 ? <div className={styles.waiting}><LockKeyhole size={18}/><div><strong>{room.waitingCount.toLocaleString()} {room.waitingCount === 1 ? 'thought is' : 'thoughts are'} waiting further along.</strong><p>They’ll meet you when you get there.</p></div></div> : null}
         {room ? <p className={styles.refreshNote}><span/>Updates here refresh while this page is open. Only explicitly shared thoughts appear.</p> : null}
       </>}
+      </div>}
     </div>
   </div>;
 }
@@ -313,7 +321,7 @@ function Thought({ post, bookId, accountId, ceiling, ready, refreshTick, onChang
   const comments = visibleThread?.comments.filter(comment => comment.progress <= Math.min(ceiling, visibleThread.reader.progress)) ?? [];
   return <article className={styles.thought}>
     <div className={styles.thoughtHeader}><a className={styles.avatar} href={'/u/' + encodeURIComponent(post.profileId)} aria-label={`Visit ${post.name}’s profile`}>{post.name.slice(0, 1).toUpperCase()}</a><div><a href={'/u/' + encodeURIComponent(post.profileId)}>{post.name}</a><time dateTime={post.entry.createdAt}>{readingDate(post.entry.createdAt)}</time></div><span className={styles.thoughtMarker}>{readingMarker(post.entry)}</span></div>
-    {post.entry.body ? <p className={styles.thoughtBody}>{post.entry.body}</p> : <p className={styles.milestone}>{post.entry.progress === 100 ? 'Finished this book.' : post.entry.progress === 0 ? 'Started a new reading journey.' : `A new bookmark at ${post.entry.progress}%.`}</p>}
+    {post.entry.body ? <p className={styles.thoughtBody}>{post.entry.body}</p> : <p className={styles.milestone}>{post.entry.progress === 100 ? 'Finished this book.' : post.entry.progress === 0 ? 'Started a new reading journey.' : `A new bookmark at ${percentage(post.entry.progress)}%.`}</p>}
     <button type="button" className={styles.openReplies} aria-expanded={open} aria-controls={'room-replies-' + post.id} onClick={() => { if (!open) { setThread(null); setLoadedAt(null); } setOpen(value => !value); }}><MessageCircle size={15}/>{post.commentCount ? `${post.commentCount} ${post.commentCount === 1 ? 'reply' : 'replies'} at your bookmark` : 'Leave a reply'}<ChevronDown size={14} className={open ? styles.chevronOpen : ''}/></button>
     {open ? <section className={styles.replies} id={'room-replies-' + post.id} aria-label={'Replies to ' + post.name}>
       {loading && !visibleThread ? <p className={styles.replyStatus} role="status"><LoaderCircle size={14} className="spin"/>Opening replies at your bookmark…</p> : null}

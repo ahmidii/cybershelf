@@ -32,7 +32,8 @@ export const readingPosts=sqliteTable('reading_posts',{
   bookId:text('book_id').notNull(),entryId:text('entry_id').notNull(),snapshot:text('snapshot').notNull(),
   imageIds:text('image_ids').notNull(),publishedAt:text('published_at').notNull(),updatedAt:text('updated_at').notNull(),
   bookKey:text('book_key').notNull().default(''),
-},table=>[uniqueIndex('reading_posts_owner_entry_idx').on(table.ownerId,table.entryId),index('reading_posts_profile_date_idx').on(table.profileId,table.publishedAt),index('reading_posts_book_owner_date_idx').on(table.bookKey,table.ownerId,table.publishedAt,table.id)]);
+  catalogId:text('catalog_id'),
+},table=>[uniqueIndex('reading_posts_owner_entry_idx').on(table.ownerId,table.entryId),index('reading_posts_profile_date_idx').on(table.profileId,table.publishedAt),index('reading_posts_book_owner_date_idx').on(table.bookKey,table.ownerId,table.publishedAt,table.id),index('reading_posts_catalog_owner_idx').on(table.catalogId,table.ownerId)]);
 export const readingComments=sqliteTable('reading_comments',{
   id:text('id').primaryKey(),postId:text('post_id').notNull().references(()=>readingPosts.id,{onDelete:'cascade'}),
   ownerId:text('owner_id').notNull(),profileId:text('profile_id'),name:text('name').notNull(),body:text('body').notNull(),
@@ -113,3 +114,17 @@ export const readerActivity = sqliteTable('reader_activity', {
   profileId: text('profile_id').notNull(), kind: text('kind', { enum: ['purchased', 'added'] }).notNull(),
   bookId: text('book_id').notNull(), snapshot: text('snapshot').notNull(), createdAt: text('created_at').notNull(),
 }, table => [index('reader_activity_owner_date_idx').on(table.ownerId, table.createdAt), index('reader_activity_profile_date_idx').on(table.profileId, table.createdAt)]);
+
+// An explicit manual catalog publication contains only bibliographic text.
+// Private files, covers, journals and account identifiers never enter it.
+export const communityBooks=sqliteTable('community_books',{
+  id:text('id').primaryKey(),title:text('title').notNull(),author:text('author').notNull(),createdAt:text('created_at').notNull(),
+});
+export const bookRatings=sqliteTable('book_ratings',{
+  ownerId:text('owner_id').notNull().references(()=>user.id,{onDelete:'cascade'}),catalogId:text('catalog_id').notNull(),
+  rating:real('rating').notNull(),createdAt:text('created_at').notNull(),updatedAt:text('updated_at').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.catalogId]}),index('book_ratings_catalog_idx').on(table.catalogId)]);
+export const bookReads=sqliteTable('book_reads',{
+  ownerId:text('owner_id').notNull().references(()=>user.id,{onDelete:'cascade'}),id:text('id').notNull(),catalogId:text('catalog_id').notNull(),
+  finishedAt:text('finished_at').notNull(),createdAt:text('created_at').notNull(),
+},table=>[primaryKey({columns:[table.ownerId,table.id]}),uniqueIndex('book_reads_owner_catalog_date_idx').on(table.ownerId,table.catalogId,table.finishedAt),index('book_reads_catalog_owner_idx').on(table.catalogId,table.ownerId)]);

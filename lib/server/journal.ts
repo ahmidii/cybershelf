@@ -24,7 +24,7 @@ export async function readingComments(post:ReadingPostRow,viewerId?:string):Prom
 }
 
 /** A retained event counter prevents deletion from resetting posting limits. */
-export async function reserveReadingAction(ownerId:string,kind:'post'|'comment'){
+export async function reserveReadingAction(ownerId:string,kind:'post'|'comment'|'catalog'|'rating'|'read'){
   const now=Date.now(),timestamp=new Date(now).toISOString(),minute=new Date(now-60_000).toISOString(),day=new Date(now-86_400_000).toISOString();
   const db=database(),minuteLimit=kind==='comment'?10:20,dayLimit=kind==='comment'?200:500;
   const results=await db.batch([

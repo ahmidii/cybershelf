@@ -73,3 +73,5 @@
 
 .togetherLink{display:flex;align-items:center;gap:7px;font-size:12px;color:#617b4c;background:#eef3e6;border:1px solid #dce5cd;padding:10px 13px;border-radius:6px;margin:-7px 0 21px;text-align:left;min-height:39px}
 .togetherLink>span{flex:1}
+
+.embedded{margin:0;max-width:none}.embedded .timelineHeading{margin:22px 0 18px}.embedded .timelineHeading h2{font-size:27px}.historyHelp{font-size:12px;line-height:1.8;color:#708061;margin-top:9px;max-width:510px}.embedded .entry{padding:21px 23px}.bookNotes{display:flex;align-items:center;gap:8px;border-top:1px solid #dfe5d4;width:100%;text-align:left;padding:18px 1px;color:#667d55;font-size:12px;margin-top:23px}.bookNotes>svg:last-child{margin-left:auto}@media(max-width:600px){.embedded .entry{padding:19px 16px}.historyHelp{font-size:11px}.embedded .entryBody{font-size:14px}.embedded .entryActions{gap:12px}.embedded .timelineHeading h2{font-size:26px}}

@@ -27,6 +27,7 @@ export interface LibraryConnection {
 }
 export interface Book {
   id: string; title: string; author: string; coverUrl: string; color: string;
+  catalogId?: string; editionId?: string;
   isbn?: string; description?: string; pages?: number;
   format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string;
   readingLog?: ReadingLogEntry[];
@@ -58,7 +59,7 @@ export interface Profile { name: string; bio: string; featuredShelfId?: string; 
 export interface AppState { schemaVersion: 1; profile: Profile; books: Book[]; shelves: Shelf[]; connections?: LibraryConnection[]; }
 export interface StateResponse { state: AppState | null; version: number; user: { id: string; name: string }; }
 export interface Asset { id: string; filename: string; mime: string; size: number; url: string; }
-export interface PublicBook { id: string; title: string; author: string; coverUrl: string; color: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string; }
+export interface PublicBook { id: string; title: string; author: string; coverUrl: string; color: string; catalogId?: string; editionId?: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string; }
 export interface Publication {
   id: string; shelf: Shelf; books: PublicBook[]; name: string;
   publishedAt: string; bookCount: number; profileId?: string;
@@ -78,7 +79,7 @@ export interface ActivityEvent {
   book?: PublicBook; progress?: number; body?: string; postId?: string;
   shelf?: Publication; commentId?: string;
 }
-export interface SearchBook { title: string; author: string; coverUrl: string; isbn?: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; }
+export interface SearchBook { title: string; author: string; coverUrl: string; catalogId?: string; editionId?: string; isbn?: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; }
 export const FINISHES: {id:ShelfFinish;name:string;color:string}[] = [
   {id:'paper',name:'Paper',color:'#eeede6'}, {id:'oak',name:'Warm oak',color:'#b59168'},
   {id:'moss',name:'Moss',color:'#879479'}, {id:'ink',name:'Ink',color:'#373e39'},
