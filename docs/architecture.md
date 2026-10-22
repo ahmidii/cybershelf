@@ -54,7 +54,7 @@ Sorting uses the positions of movable books already on the shelf. A continuous p
 | `db/schema.ts` / `drizzle/` | Database schema and immutable schema migrations. |
 | `worker/index.ts` | Worker entry point and retained Sites request context. |
 
-The maintained starter includes connector plumbing, but this release does not use it to connect retailer or Goodreads accounts. No account synchronization should be inferred from those supporting files.
+The maintained starter includes connector plumbing, but it is unrelated to the native Hardcover browser connector. `lib/connections/hardcover.ts` performs provider OAuth and API calls directly in the browser; `lib/use-connections.ts` holds sessions above the application views. Only whitelisted connection metadata enters `useLibrary`. Retailer and Goodreads live account access is not supplied by the starter plumbing.
 
 ## Persistence and saves
 
@@ -93,6 +93,9 @@ Anonymous edits use a clearly labelled browser-local draft. They are not synchro
 | `DELETE /api/assets/[id]` | Asset owner only: removal subject to reference checks. |
 | `GET /api/search?q=...` | Bounded metadata search backed by Open Library. |
 | `GET /api/book-details?isbn=...` | Cached, bounded edition appearance lookup for a valid ISBN. |
+| `GET /api/connections/config` | Signed-in owner: provider availability and optional public application ID; no credentials. |
+| `GET /api/reading-room?bookId=...` | Signed-in reader: own/followed shared entries through the selected saved bookmark, ordered and paginated. |
+| `GET/POST /api/reading-room/[postId]/comments?bookId=...` | Signed-in reader: protected replies and bounded reply creation within the selected bookmark. |
 | `GET /api/publications` | Published shelf snapshots, paginated for Explore. |
 | `POST /api/publications` | Signed-in owner: publish/update a snapshot of a saved shelf. |
 | `GET /api/publications/[id]` | Read one published snapshot. |
@@ -177,4 +180,16 @@ The retained `.openai/hosting.json` records the original development Site identi
 
 Metadata search sends the query to Open Library. External cover URLs load from their respective hosts. Platform source links navigate to those services; they do not establish linked-account access or file export rights.
 
-Future account connectors, OPDS support, progress synchronization, standalone public reviews, richer physical fit planning, and notification delivery should be separate additions with visible capability boundaries. They are not supplied by the social journal or visual shelf geometry.
+Further account connectors, OPDS support, synchronization across reader devices, standalone public reviews, richer physical fit planning, and notification delivery should be separate additions with visible capability boundaries. They are not supplied by the social journal or visual shelf geometry.
+
+## Reading rooms and account sync in v0.4
+
+`reading_posts.book_key` is an indexed normalized title/author key. Newly shared entries write it immediately. Existing shared entries are indexed with the same JavaScript Unicode normalization in bounded batches; a retryable preparation response is preferable to an incomplete conversation. This adds no private library text to a public record.
+
+Room requests resolve the authenticated reader’s selected book from the saved library. The selected copy alone supplies the ceiling, so a finished edition elsewhere in the library cannot unlock a reread. The SQL query includes only currently public profiles from followed owners or the reader themselves. Later bodies are not serialized. Counts and replies use the same ceiling, including a parent entry’s effective marker. Cursor context includes the book, ordering, and ceiling; changed progress cannot reuse a higher cursor. Replies recheck library version, parent revision, follow membership, and current profile in the atomic insert.
+
+The room UI clears stale views when permission checks fail and expires expanded replies when its parent refreshes. It uses its own protected routes; the existing public conversation pages and feed retain their separate deliberate-reveal controls. Shared posts remain public data even though a reader’s room selects a safe subset.
+
+Hardcover credentials live only in an opaque browser session. Pending OAuth state/verifier is account-bound and short-lived; token exchange, library calls, refresh rotation, and revocation never pass through Cybershelf. The callback has `Referrer-Policy: no-referrer` and `Cache-Control: private, no-store`. The optional public client ID is read from Worker runtime configuration.
+
+Connection sync applies an explicit field allowlist, with the last accepted values used as a three-way baseline. Local edits win conflicts; reading status and progress move together only when enabled and sufficiently specified. Removing a provider record never removes the local book. Imported metadata, preferences, and matching fingerprints are stored in D1; provider credentials are not. This protects credential handling in the current implementation, not against operator-readable metadata or altered future JavaScript. See [account connections](account-connections.md) for exact setup and the threat boundary.

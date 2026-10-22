@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 — Reading together, connected books — 2026-10-22
+
+### Added
+
+- Per-book Reading together rooms: the reader’s own and followed readers’ explicitly shared thoughts, through the selected copy’s saved bookmark, in reading order or newest first.
+- Server-filtered later thoughts and replies, visible-only reply counts, waiting counts, and progress-bound keyset pagination. A finished duplicate does not override a reread.
+- Inline protected replies, page/percentage bookmark controls, private or explicitly shared thought composition, and refresh on focus and every 45 seconds while visible.
+- Entry points from book details, the reading journal, the following feed, and main navigation.
+- A Connections page and a native Hardcover browser OAuth connector, gated by the installation’s public `HARDCOVER_CLIENT_ID`. Authorization uses S256 PKCE and read scopes; tokens stay in memory and requests go directly to the provider.
+- A preview before importing, optional reading progress, five-minute refresh while the authorized tab is visible, reconnect/disconnect controls, and revocation.
+- Three-way metadata merging that preserves local edits, distinct editions, shelves, files, and journal entries. Remote removals never delete local books. Connection metadata survives catalog backups; credentials do not.
+- Indexed book matching and bounded Unicode-aware backfill for existing shared reading posts in D1 migration `0005_reading_rooms`.
+- Provider protocol, merge, persistence/privacy, and real-Worker integration coverage. Owner activation and provider capability documentation lives in `docs/account-connections.md`.
+
+### Boundaries
+
+- Hardcover setup is a one-time owner task; the release does not include an already registered public client ID or a completed real-user OAuth authorization test.
+- Sync reads Hardcover into Cybershelf. It does not write back or continue after the browser session closes. Goodreads remains CSV import; retail account and universal reader sync are not implemented.
+- Imported metadata is stored in the ordinary private library and remains accessible to the service operator. Browser-only credentials are not end-to-end encryption or protection against a malicious future version of the website.
+- Shared thoughts and replies remain public writing. Reading-room protection follows declared markers and conservative title/author matching; comparisons between editions are approximate.
+
 ## 0.3.0 — Direct shelf placement — 2026-10-22
 
 ### Changed

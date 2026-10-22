@@ -44,5 +44,6 @@ export function appendReadingEntry(state: AppState, bookId: string, entry: Readi
 }
 
 export function readingMarker(entry: Pick<ReadingLogEntry, 'page' | 'progress'>): string {
-  return entry.page !== undefined ? `Page ${entry.page.toLocaleString()} · ${entry.progress}%` : `${entry.progress}% read`;
+  const progress = Math.round(entry.progress * 10) / 10;
+  return entry.page !== undefined ? `Page ${entry.page.toLocaleString()} · ${progress}%` : `${progress}% read`;
 }

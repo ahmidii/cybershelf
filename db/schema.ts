@@ -31,7 +31,8 @@ export const readingPosts=sqliteTable('reading_posts',{
   id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),profileId:text('profile_id').notNull(),
   bookId:text('book_id').notNull(),entryId:text('entry_id').notNull(),snapshot:text('snapshot').notNull(),
   imageIds:text('image_ids').notNull(),publishedAt:text('published_at').notNull(),updatedAt:text('updated_at').notNull(),
-},table=>[uniqueIndex('reading_posts_owner_entry_idx').on(table.ownerId,table.entryId),index('reading_posts_profile_date_idx').on(table.profileId,table.publishedAt)]);
+  bookKey:text('book_key').notNull().default(''),
+},table=>[uniqueIndex('reading_posts_owner_entry_idx').on(table.ownerId,table.entryId),index('reading_posts_profile_date_idx').on(table.profileId,table.publishedAt),index('reading_posts_book_owner_date_idx').on(table.bookKey,table.ownerId,table.publishedAt,table.id)]);
 export const readingComments=sqliteTable('reading_comments',{
   id:text('id').primaryKey(),postId:text('post_id').notNull().references(()=>readingPosts.id,{onDelete:'cascade'}),
   ownerId:text('owner_id').notNull(),profileId:text('profile_id'),name:text('name').notNull(),body:text('body').notNull(),

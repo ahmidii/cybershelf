@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runIntegration } from '../lib/server/integration.test.mjs';
+import { runReadingRoomIntegration } from '../lib/server/reading-room.integration.mjs';
 
 // Reuse Wrangler's pinned Miniflare without adding a second runtime version.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -78,6 +79,7 @@ try {
   assert.match(await signIn.text(), /email/i);
   console.log('✓ Guest home and sign-in render from the production Worker bundle.');
   await runIntegration({ base, fetch: requestFetch, report: message => console.log('✓ ' + message) });
+  await runReadingRoomIntegration({ base, fetch: requestFetch, database, report: message => console.log('✓ ' + message) });
   const hashes = await database.prepare('SELECT password FROM auth_account').all();
   assert.ok(hashes.results.length >= 2);
   for (const row of hashes.results) {

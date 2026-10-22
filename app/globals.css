@@ -139,3 +139,6 @@ body:has([data-shelf-controls]) .workspace { padding-bottom: calc(230px + env(sa
   .workspace-footer { font-size: 10px; gap: 12px; }
   .workspace-footer .text-button { font-size: 10px; }
 }
+
+/* Keep every navigation and account action reachable on short screens. */
+.sidebar{overflow-y:auto;overscroll-behavior:contain}.sidebar>.brand,.sidebar-caption,.main-nav,.sidebar-bottom{flex-shrink:0}.shelf-nav{flex-shrink:0;max-height:min(28vh,260px)}

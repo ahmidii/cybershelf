@@ -31,7 +31,7 @@
 .spoilerGuard>button{flex:none}
 .hideAgain{display:flex;align-items:center;gap:6px;color:#7c8a6c;font-size:10px;margin-top:12px;padding:0}
 .hideAgain:hover{text-decoration:underline}
-.cardFooter{border-top:1px solid #e6e7df;padding-top:15px;margin-top:20px}
+.cardFooter{display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;border-top:1px solid #e6e7df;padding-top:15px;margin-top:20px}
 .cardFooter a{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:#6d805b}
 .cardFooter a:hover{text-decoration:underline}
 .shelfPreview{display:block}
@@ -81,3 +81,6 @@
   .personalLists{grid-template-columns:1fr;gap:11px}.people summary{font-size:10px}.peopleList{max-height:235px}
 }
 @media(prefers-reduced-motion:reduce){.people summary>svg:last-child{transition:none}}
+
+.readTogether{display:inline-flex;align-items:center;gap:7px;min-height:37px;padding:8px 11px;border:1px solid #d7e1c9;border-radius:5px;background:#edf3e3;color:#587545;font-size:11px;text-align:left}
+.readTogether:hover{background:#e4ecd8}

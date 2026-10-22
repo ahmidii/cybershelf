@@ -1,5 +1,5 @@
 import { newBook, shelfCapacity, shelfGrid, shelfPlacementError, uid } from './types';
-import type { AppState, Book, BookSource, ReadingLogEntry, ReadingStatus, Shelf, ShelfItem } from './types';
+import type { AppState, Book, BookSource, ImportedBookFields, LibraryConnection, ReadingLogEntry, ReadingStatus, Shelf, ShelfItem } from './types';
 import { validBookDimensions } from './book-size';
 
 const MAX_CSV_BYTES = 10 * 1024 * 1024;
@@ -295,6 +295,25 @@ export function parseCatalogJSON(text: string): AppState {
   const root = object(parsed, 'catalog');
   if (root.schemaVersion !== 1) throw new Error('This backup uses an unsupported format. Choose a version 1 cybershelf catalog.');
   const profile = object(root.profile, 'profile');
+  const connections: LibraryConnection[] | undefined = root.connections === undefined ? undefined : list(root.connections, 'account connections', 10).map(raw => {
+    const value = object(raw, 'account connection');
+    const accountKey = string(value.accountKey, 'connection account key', 64);
+    if (!/^[a-f0-9]{64}$/.test(accountKey)) throw new Error('Invalid backup: an account connection has an invalid identity.');
+    if (typeof value.autoSync !== 'boolean' || typeof value.syncProgress !== 'boolean') throw new Error('Invalid backup: connection preferences are missing.');
+    const connection: LibraryConnection = { id: id(value.id, 'connection ID'), provider: enumValue(value.provider, ['hardcover'] as const, 'connection provider'), accountKey, label: string(value.label, 'connection label', 80), autoSync: value.autoSync, syncProgress: value.syncProgress, connectedAt: date(value.connectedAt, 'connection date') };
+    if (!connection.label.trim()) throw new Error('Invalid backup: an account connection needs a name.');
+    if (value.lastSyncedAt !== undefined) connection.lastSyncedAt = date(value.lastSyncedAt, 'last sync date');
+    if (value.lastSummary !== undefined) {
+      const summary = object(value.lastSummary, 'last sync summary');
+      const count = (key: string) => { const amount = number(summary[key], 'sync summary', 0, 2000); if (!Number.isInteger(amount)) throw new Error('Invalid backup: sync counts must be whole numbers.'); return amount; };
+      connection.lastSummary = { added: count('added'), updated: count('updated'), preserved: count('preserved') };
+    }
+    return connection;
+  });
+  unique((connections ?? []).map(connection => connection.id), 'account connections');
+  unique((connections ?? []).map(connection => connection.accountKey), 'connected account identities');
+  const connectionIds = new Set(connections?.map(connection => connection.id));
+  const remoteRecords = new Set<string>();
   const books: Book[] = list(root.books, 'books', MAX_BOOKS).map((raw, index) => {
     const data = object(raw, `book ${index + 1}`), context = `book ${index + 1}`;
     const color = string(data.color, `${context} color`, 7);
@@ -340,6 +359,22 @@ export function parseCatalogJSON(text: string): AppState {
       if (!Number.isInteger(book.pages)) throw new Error(`Invalid backup: ${context} pages must be a whole number.`);
     }
     if (data.finishedAt !== undefined) book.finishedAt = date(data.finishedAt, `${context} finished date`);
+    if (data.connections !== undefined) book.connections = list(data.connections, 'linked account records', 20).map(raw => {
+      const link = object(raw, 'linked account record');
+      const connectionId = id(link.connectionId, 'linked connection ID'), remoteId = id(link.remoteId, 'remote book ID');
+      if (!connectionIds.has(connectionId)) throw new Error('Invalid backup: a book refers to a missing account connection.');
+      const key = connectionId + ':' + remoteId;
+      if (remoteRecords.has(key)) throw new Error('Invalid backup: a connected book is linked more than once.');
+      remoteRecords.add(key);
+      const fields = object(link.lastImported, 'last imported metadata'), lastImported: ImportedBookFields = {};
+      for (const key of ['title', 'author', 'isbn'] as const) if (fields[key] !== undefined) lastImported[key] = string(fields[key], 'imported ' + key, key === 'isbn' ? 32 : 500);
+      if (fields.coverUrl !== undefined) lastImported.coverUrl = url(fields.coverUrl, 'imported cover URL', true);
+      if (fields.pages !== undefined) { lastImported.pages = number(fields.pages, 'imported pages', 0, 100000); if (!Number.isInteger(lastImported.pages)) throw new Error('Invalid backup: imported pages must be whole numbers.'); }
+      if (fields.status !== undefined) lastImported.status = enumValue(fields.status, ['unread', 'reading', 'read', 'paused', 'dnf'] as const, 'imported status');
+      if (fields.progress !== undefined) lastImported.progress = number(fields.progress, 'imported progress', 0, 100);
+      if (fields.rating !== undefined) lastImported.rating = fields.rating === null ? null : number(fields.rating, 'imported rating', 0, 5);
+      return { connectionId, remoteId, sourceId: id(link.sourceId, 'connected source ID'), lastImported };
+    });
     return book;
   });
   unique(books.map(book => book.id), 'books');
@@ -394,7 +429,7 @@ export function parseCatalogJSON(text: string): AppState {
   });
   unique(shelves.map(shelf => shelf.id), 'shelves');
   const featuredShelfId = profile.featuredShelfId === undefined ? undefined : id(profile.featuredShelfId, 'featured shelf');
-  return { schemaVersion: 1, profile: { name: string(profile.name, 'profile name', 80), bio: string(profile.bio, 'profile bio', 1000, ''), ...(featuredShelfId && shelves.some(shelf => shelf.id === featuredShelfId) ? { featuredShelfId } : {}) }, books, shelves };
+  return { schemaVersion: 1, profile: { name: string(profile.name, 'profile name', 80), bio: string(profile.bio, 'profile bio', 1000, ''), ...(featuredShelfId && shelves.some(shelf => shelf.id === featuredShelfId) ? { featuredShelfId } : {}) }, books, shelves, ...(connections ? { connections } : {}) };
 }
 
 interface ZipEntry { path: string; offset: number; method: number; compressed: number; size: number; }

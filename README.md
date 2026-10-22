@@ -4,7 +4,7 @@ A place to collect books, arrange personal shelves, and keep a reading life with
 
 cybershelf separates a **Library** from the shelves you make with it. A book can be something you own, borrowed, have read, or simply want to remember. Add it once, then display it on as many themed shelves as you like. The `cybershe\f` wordmark and `||\` icon echo upright and leaning books, paired with a consistent serif-and-sans interface.
 
-This repository contains version 0.3: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
+This repository contains version 0.4: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
 
 ## What you can do
 
@@ -15,6 +15,8 @@ This repository contains version 0.3: a React application, its server API, datab
 - **Decorate:** use the built-in plant, bear, robot, vase, and bookend, or upload a PNG, JPEG, or WebP image.
 - **Grab a book:** download your uploaded original, open a saved reading-platform or library link, or check the location of a physical copy. A catalog entry does not imply ownership.
 - **Keep a reading journal:** save a thought or progress-only milestone at a page/percentage. Each entry keeps its own marker as you read on. Save privately or deliberately share an individual update. Existing reviews and notes remain private.
+- **Read together, at your own pace:** open a book’s reading room to see your followed readers’ and your own shared thoughts through the selected copy’s saved bookmark. Read in book order or newest first, reply inline, and uncover more as you read. Later text is withheld by the room API, including replies. A finished second edition does not override a reread.
+- **Connect a book account:** when the installation enables Hardcover, authorize directly with the provider, review the import, and refresh book metadata while Cybershelf is open. Progress sync is optional. Your edits, files, shelves, and private journal are retained. Provider credentials stay in browser memory; imported metadata is stored in your Cybershelf account. [Owner setup and privacy details](docs/account-connections.md).
 - **Introduce yourself:** choose one featured shelf, preview your profile, and publish it when ready. Your profile has a stable public link while published.
 - **Read with company:** follow public profiles, browse shared reading journeys, and reply to individual entries with your own progress marker. Thoughts beyond your saved progress, or about unread books, are hidden by default until you reveal them.
 - **Keep a reading circle:** the Following feed includes shared journal updates, replies, newly published or updated shelves, and explicit “bought a book” / “added to my library” posts. Private library changes and imports are never broadcast.
@@ -25,13 +27,17 @@ The guest preview is labelled sample content. Editing as a guest creates a draft
 
 ## What this release does not connect automatically
 
-Goodreads support is a **CSV import**, not a live account connection. Reading-platform sources are links you save. Purchase announcements are manual, explicit shares. There is no automatic retailer purchase synchronization, DRM removal, cross-reader progress synchronization, OPDS server, or full in-browser EPUB reader in this release. Uploaded originals can be downloaded and opened in a compatible reader; platform links open the respective service.
+Hardcover is the first account connector, with one-way metadata import and optional progress import. The owner must register a public OAuth application and configure `HARDCOVER_CLIENT_ID` before readers can authorize it. Sync checks run every five minutes while the authorized tab is visible; reloading or closing the page discards credentials and requires reconnecting. It does not write changes back to Hardcover or run while the app is closed.
+
+Goodreads support is a **CSV import**, not a live account connection. Reading-platform sources are links you save. Purchase announcements are manual, explicit shares. There is no automatic retailer purchase synchronization, DRM removal, universal cross-reader progress synchronization, OPDS server, or full in-browser EPUB reader in this release. Uploaded originals can be downloaded and opened in a compatible reader; platform links open the respective service.
 
 A shelf is useful for planning a physical arrangement. Books use approximate millimetre proportions and continuous horizontal positions. The placement preview checks walls, neighboring books, and stack supports; a full row asks you to choose another spot or turn the book. Existing crowded arrangements still scale together to remain visible. This is a visual preview, not a guarantee that books fit a real bookcase. Metadata is often incomplete, so estimated dimensions are labelled and editable.
 
 ## Private libraries and deliberate sharing
 
 Your account library, source links, physical locations, original book files, reviews, and private notes stay private. Publishing a shelf creates a separate snapshot containing the display name, shelf title/description, visible books, arrangement, and decorations. The staging tray is excluded. Selecting a featured shelf stays private until you publish your profile, which is independent of Explore shelf publications.
+
+Private account data is protected by authorization, not end-to-end encryption: the service operator can access stored library metadata. The Hardcover connector does not send provider tokens to the server, persist them in browser storage, or put them in backups. Its read scopes exclude account/email access and writes. Operator control of delivered JavaScript remains a trust boundary; this is not a zero-knowledge service.
 
 Reading entries start private. **Share update** publishes only the chosen entry, its marker, and the book’s public metadata. Future edits stay private until you update the shared entry. Replies are public within that conversation. Do not put later events under an earlier marker: spoiler controls compare declared progress, not the meaning of the text, and public writing is not confidential. Editions are matched conservatively by normalized title and author, with percentages used across page counts; readers can adjust the protection locally.
 
@@ -57,6 +63,7 @@ See [the architecture notes](docs/architecture.md) for the API and ownership bou
 | Replies | 100 per shared entry, 4,000 characters each |
 | Reply posting | 10 per minute and 200 per day |
 | Following | 500 readers |
+| Connected accounts | 10 |
 
 Limits are currently implemented using powers of 1,024 bytes. Large libraries can export their catalog and download originals individually if they exceed the ZIP limit. Unknown or unreadable book metadata remains editable.
 
@@ -93,7 +100,7 @@ The regression suite covers imports, backup round trips, physical shelf geometry
 
 ## Backup and restore
 
-JSON exports preserve catalog metadata, physical book appearance, shelves, the featured-shelf choice, private journal entries, and file references. They do not transfer public profile identities, follows, public conversations, or publication permissions. CSV exports include reading-log JSON in an optional column. Restoring JSON on the original account reconnects files that still exist. A ZIP export additionally contains original uploads and a manifest mapping asset IDs to archive paths.
+JSON exports preserve catalog metadata, physical book appearance, shelves, the featured-shelf choice, private journal entries, file references, and connection preferences/provenance. They contain no provider credentials; accounts must be authorized again after restoring. They do not transfer public profile identities, follows, public conversations, or publication permissions. CSV exports include reading-log JSON in an optional column. Restoring JSON on the original account reconnects files that still exist. A ZIP export additionally contains original uploads and a manifest mapping asset IDs to archive paths.
 
 This release restores the catalog JSON, not the ZIP as a single operation. For a different account or deployment, upload the files again and reconnect them; an imported asset ID does not transfer access to another account's files. Externally hosted covers and retailer purchases remain external links. Keep backups somewhere private if they contain notes, reviews, sources, or book files.
 

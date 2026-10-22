@@ -1,43 +1,48 @@
-# Release status — 0.3.0
+# Release status — 0.4.0
 
 Updated 2026-10-22.
 
 ## Source and destination
 
-The public [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf) repository remains the source for the existing Cloudflare Worker at `https://cybershelf.io`. Version 0.3 replaces numbered destinations with direct placement along each shelf, a live settled preview, wheel/touch/keyboard pose controls, and undo. The identity now uses a `||\` icon and `cybershe\f` wordmark.
+The public [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf) repository remains the source for the existing Cloudflare Worker at `https://cybershelf.io`. Version 0.4 adds per-book Reading together rooms and a browser-authorized Hardcover connector. The direct shelf controls, `||\` icon, and `cybershe\f` wordmark remain in place.
 
-The existing Worker, D1 database, R2 bucket, domain, and authentication secret are reused. This release needs no new database migration. Existing catalog state remains schema version 1; optional row/position/support fields preserve compatibility with older backups. The deploy command still applies any pending migrations before publishing the Worker and stops if a migration fails.
+The existing Worker, D1 database, R2 bucket, domain, and authentication secret are reused. Migration `0005_reading_rooms` adds the shared-book index; the deploy command applies pending migrations before publishing and stops if one fails. There are now six migrations. Catalog state remains schema version 1, with optional connection records and backward-compatible backups.
 
-## Verification
+**Hardcover requires one-time owner activation.** Its code and configuration screen are included, but the repository does not contain a registered `HARDCOVER_CLIENT_ID`. Until the owner registers a public single-page OAuth application and sets that runtime variable, the UI truthfully reports authorization as unavailable. See [account connections](account-connections.md) for exact settings. No additional Cloudflare storage resource is required.
 
-- TypeScript validation passed for the complete application.
-- **84 regression tests passed**, with no failures, skips, or cancellations. The runner reports individual test cases.
-- The production Vinext build passed, including the updated shelf canvas and the existing profile, journal, and social routes.
-- Wrangler’s deployment dry run passed without publishing or applying remote migrations; the generated Worker configuration retains the expected DB/BUCKET bindings and custom domain.
-- All five migrations applied to disposable D1 storage.
-- The built Worker passed end-to-end API integration checks with temporary accounts, ephemeral D1/R2, real signed sessions, and outbound network access disabled.
+## Source verification
+
+- Full TypeScript validation passed.
+- **107 regression cases passed**, with no failures, skips, or cancellations.
+- The production Vinext build passed, including the reading-room API, Connections, and OAuth callback page.
+- Wrangler’s deployment dry run passed without publishing or applying remote migrations. It retained the existing DB/BUCKET bindings and domain configuration.
+- All six migrations applied to disposable D1 storage.
+- The built Worker passed integration checks with temporary accounts, ephemeral D1/R2, real signed sessions, and outbound network access disabled.
 - Source publication excludes dependencies, build output, temporary databases, and secrets. Dependency versions and the lockfile are unchanged.
 
-New regression coverage includes arbitrary continuous positions, gallery rows with more than four books, insertion without swapping, inferred piles, removing bottom/middle supports, wall/pile leaning, blocked full destinations, legacy arrangement migration, exact preview/committed geometry equality, and collision bounds across all bookcases. Data checks cover coordinate bounds, support graphs, copying/removing piles, sorting roles, and backup round trips. Existing book metadata, reading-log, public-field, and spoiler-render checks still pass.
+New regression coverage checks provider mapping and scopes, PKCE state/account/issuer validation, expired and replayed callbacks, memory-only credentials, pagination without partial imports, response-size limits, refresh rotation, and cancellation. Merge checks cover manual edits, equivalent ISBNs, distinct editions, complete bookmark pairs, rereads, progress preference changes, idempotent retries, atomic limit rejection, non-destructive disconnects, field allowlists, and connection backup round trips.
 
-The built Worker suite verifies exact private PUT/GET persistence of continuous coordinates and stack supports, rejects stale or invalid saves without changing the saved state, and checks the same placements in public shelf and featured-profile snapshots. It also exercises account isolation, stale-account headers, optimistic save conflicts, concurrent publication/removal, profile snapshots independent of Explore, private edits remaining private, source/file redaction, public-image retention and revocation, journal sharing/unsharing, reply moderation, persistent posting limits, effective reply markers after a parent update, feed/announcement pagination, explicit acquisition sharing, follows across profile privacy changes, session revocation, and authentication rate limiting.
+The real-Worker room suite checks Unicode-aware legacy indexing, selected-copy bookmark ceilings, absence of future post/reply bodies from responses, safe reply markers, progress moving forward and backward, both pagination orders, self/follow membership, profile revocation, and parent reshares. Configuration access respects authenticated account boundaries, and the callback is uncached and sends no referrer. Existing authentication, private originals, shelves, profiles, journals, feed, moderation, publication revocation, and rate-limit checks still pass.
 
-## Visual verification
+## Provider and browser verification limits
 
-The managed local preview supervisor was unavailable in this workspace, so local browser-based visual, responsive, and gesture QA could not be completed before publication. Production build, API, geometry, and markup checks do not establish that a full browser/device review passed. Live desktop checks belong in the deployment report; on-device iPhone gesture testing remains a separate check.
+Hardcover’s live public discovery document, scope metadata, and browser CORS preflights were verified without credentials. The OAuth protocol and mapping tests use controlled provider responses. A real-user authorization round trip remains unverified until the owner registers the public client ID; discovery checks do not establish that end-to-end consent passed.
 
-A source push and local dry run do not by themselves prove that Cloudflare’s production build or domain deployment completed. Check the latest Workers Builds deployment for the pushed commit and open the actual domain after deployment. No real account data is used by the integration tests.
+The managed local preview supervisor is unavailable in this workspace. Local visual and responsive browser QA could not run before publication. Build/API checks do not replace a browser/device review. Any live desktop checks belong in the deployment report; on-device iPhone testing remains separate.
+
+A source push and dry run do not prove that Cloudflare’s production build or domain deployment completed. Check the Workers Builds result for the pushed commit and the actual domain. The integration suite uses no production account data.
 
 ## Product boundaries
 
-- Book dimensions are labelled estimates, catalog values, or manual measurements. Generated spines are a visual fallback; optional uploaded art can supply an actual spine. Shelves scale to the available display and do not guarantee a real-world fit.
-- Settling is deterministic constrained geometry with animation, not a general physics simulation.
-- Shelf positions are continuous within physical rows and compartments. A destination without enough room is rejected visibly; the original placement remains intact. Pose controls offer six choices instead of unrestricted rotation. Touch dragging starts on a book or decoration; blank shelf areas retain page scrolling.
-- Existing reviews, notes, ordinary progress changes, and private shelf creation stay private. Journal entries and acquisition announcements are shared explicitly.
-- Spoiler protection follows reader-supplied markers and conservative title/author matching. Percentage comparisons across editions are approximate, and incorrectly marked text can still spoil a story.
-- The feed is an in-app stream with refresh-on-focus/visibility and periodic refresh while visible. Email and push notifications are not included.
-- Goodreads support remains CSV import. Retailer sources are saved links; purchases and reader progress do not synchronize automatically. Original EPUB/PDF uploads can be retrieved, but DRM removal, OPDS, and a full EPUB reader are not included.
-- Basic accounts retain the existing email/password flow. Email delivery and forgotten-password recovery are not configured; the signup screen explains this.
-- Catalog backups include private reading history and physical shelf metadata. They do not transfer social identities, follows, public conversations, or sharing permissions. Cross-account ZIP restoration still requires reconnecting uploaded originals.
+- Reading rooms include only the reader’s and followed readers’ explicitly shared entries. The room API withholds later text. Shared posts remain public writing; the existing public thread/feed routes retain their own deliberate-reveal controls.
+- Protection depends on reader-supplied markers and conservative normalized title/author matching. Percentages across editions are approximate; incorrectly marked text can still spoil a story.
+- Hardcover sync reads into Cybershelf and runs while the authorized browser tab is visible. Reloading or closing the page discards tokens. It is not bidirectional or unattended synchronization.
+- Reading progress sync is opt-in. Local edits win conflicts, and remote removals never delete local books, shelves, files, or journal entries. A provider’s ownership flag is not a verified purchase.
+- Provider tokens are not sent to Cybershelf or saved in backups. Imported library metadata is stored by Cybershelf and remains accessible to its operator. This release does not provide end-to-end encryption or protection against changed future website code.
+- Goodreads remains CSV import. Retailer locations remain saved links. Automatic retailer purchases, universal reader progress sync, DRM removal, OPDS, and a full EPUB reader are not included.
+- Private library changes do not broadcast activity. Thoughts, shelf snapshots, and acquisition announcements are shared deliberately. The feeds refresh in-app; email/push delivery is not included.
+- Book sizes are labelled estimates, catalog values, or manual measurements. Shelf settling is deterministic geometry with animation, and the visual arrangement does not guarantee a physical fit.
+- Basic email/password accounts retain their existing limitations: email delivery and forgotten-password recovery are not configured.
+- Backups include connection preferences/provenance and private reading history, but not provider credentials, social identities, follows, or sharing permissions. Cross-account file restoration still requires reconnecting uploaded originals.
 
-See the [README](../README.md), [changelog](../CHANGELOG.md), [architecture](architecture.md), and [Cloudflare setup guide](self-hosting.md).
+See the [README](../README.md), [changelog](../CHANGELOG.md), [architecture](architecture.md), [account setup](account-connections.md), and [Cloudflare guide](self-hosting.md).

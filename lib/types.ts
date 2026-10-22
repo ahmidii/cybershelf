@@ -10,6 +10,21 @@ export interface ReadingLogEntry {
   id: string; body: string; progress: number; page?: number;
   createdAt: string;
 }
+/** Public-provider credentials never belong in these persisted records. */
+export interface ImportedBookFields {
+  title?: string; author?: string; coverUrl?: string; isbn?: string; pages?: number;
+  status?: ReadingStatus; progress?: number; rating?: number | null;
+}
+export interface BookConnectionRecord {
+  connectionId: string; remoteId: string; sourceId: string;
+  lastImported: ImportedBookFields;
+}
+export interface LibraryConnection {
+  id: string; provider: 'hardcover'; accountKey: string; label: string;
+  autoSync: boolean; syncProgress: boolean; connectedAt: string;
+  lastSyncedAt?: string;
+  lastSummary?: { added: number; updated: number; preserved: number };
+}
 export interface Book {
   id: string; title: string; author: string; coverUrl: string; color: string;
   isbn?: string; description?: string; pages?: number;
@@ -18,6 +33,7 @@ export interface Book {
   status: ReadingStatus; progress: number; rating: number | null;
   review: string; notes: string; addedAt: string; finishedAt?: string;
   sources: BookSource[];
+  connections?: BookConnectionRecord[];
 }
 export type Bookcase = 'open' | 'cubby' | 'tower';
 export type ShelfLayout = 'balanced' | 'gallery' | 'stacks';
@@ -39,7 +55,7 @@ export interface Shelf {
   items: ShelfItem[]; updatedAt: string; publicId?: string;
 }
 export interface Profile { name: string; bio: string; featuredShelfId?: string; }
-export interface AppState { schemaVersion: 1; profile: Profile; books: Book[]; shelves: Shelf[]; }
+export interface AppState { schemaVersion: 1; profile: Profile; books: Book[]; shelves: Shelf[]; connections?: LibraryConnection[]; }
 export interface StateResponse { state: AppState | null; version: number; user: { id: string; name: string }; }
 export interface Asset { id: string; filename: string; mime: string; size: number; url: string; }
 export interface PublicBook { id: string; title: string; author: string; coverUrl: string; color: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string; }

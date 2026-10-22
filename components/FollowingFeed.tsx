@@ -1,9 +1,9 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, BookOpen, ChevronDown, Globe, LoaderCircle, MessageCircle, Plus, RefreshCw, ShieldCheck, Trash2, Users } from 'lucide-react';
-import type { ActivityEvent, AppState } from '@/lib/types';
+import type { ActivityEvent, AppState, Book } from '@/lib/types';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
-import { readerPosition } from '@/lib/reading';
+import { readerPosition, readingBookKey } from '@/lib/reading';
 import BookCover from './BookCover';
 import ShelfCanvas from './ShelfCanvas';
 import SpoilerText from './SpoilerText';
@@ -20,6 +20,7 @@ async function readResponse<T>(response: Response): Promise<T> {
 interface Props {
   state: AppState; accountId: string | null; ready: boolean; flush: () => Promise<void>;
   onOpenProfile: () => void; onExplore: () => void; notify: (message: string) => void;
+  onReadTogether?: (bookId: string) => void;
 }
 const eventLabels: Record<ActivityEvent['kind'], string> = {
   reading: 'shared a reading update', comment: 'joined a conversation', shelf: 'shared a shelf', shelf_updated: 'rearranged a shelf', purchased: 'bought a book', added: 'added a book to their library',
@@ -31,7 +32,7 @@ function eventLabel(item: ActivityEvent) {
 }
 function displayDate(value: string) { return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
 
-export default function FollowingFeed({ state, accountId, ready, flush, onOpenProfile, onExplore, notify }: Props) {
+export default function FollowingFeed({ state, accountId, ready, flush, onOpenProfile, onExplore, notify, onReadTogether }: Props) {
   const [items, setItems] = useState<ActivityEvent[]>([]), [following, setFollowing] = useState<FollowingReader[]>([]), [ownUpdates, setOwnUpdates] = useState<ActivityEvent[]>([]);
   const [ownProfileId, setOwnProfileId] = useState(''), [followingCount, setFollowingCount] = useState(0), [nextCursor, setNextCursor] = useState<string | undefined>();
   const [ownNextCursor, setOwnNextCursor] = useState<string | undefined>(), [loadingOwnMore, setLoadingOwnMore] = useState(false);
@@ -40,6 +41,12 @@ export default function FollowingFeed({ state, accountId, ready, flush, onOpenPr
   const [shareKind, setShareKind] = useState<'added' | 'purchased'>('added'), [bookId, setBookId] = useState('');
   const requestSerial = useRef(0), activeRequest = useRef<AbortController | null>(null), paginationActive = useRef(false), currentAccount = useRef(accountId);
   currentAccount.current = accountId;
+  const conversationBooks = useMemo(() => {
+    const matches = new Map<string, Book>();
+    const byReadingPlace = [...state.books].sort((a, b) => Number(b.status === 'reading') - Number(a.status === 'reading') || (a.status === 'read' ? 100 : a.progress) - (b.status === 'read' ? 100 : b.progress));
+    for (const book of byReadingPlace) { const key = readingBookKey(book); if (!matches.has(key)) matches.set(key, book); }
+    return matches;
+  }, [state.books]);
   const bookChoices = useMemo(() => [...state.books].sort((a, b) => a.title.localeCompare(b.title)), [state.books]);
   const refresh = useCallback(async () => {
     if (!accountId) { setLoading(false); return; }
@@ -143,6 +150,7 @@ export default function FollowingFeed({ state, accountId, ready, flush, onOpenPr
       {loading && !items.length ? <div className={styles.loading} role="status"><LoaderCircle className="spin" size={22} />Opening your reading circle…</div> : null}
       {!loading && !error && !items.length ? <div className={styles.empty}><Users size={32} strokeWidth={1.2} /><h2>{followingCount ? 'A quiet moment in your circle.' : 'Good books lead to good company.'}</h2><p>{followingCount ? 'New shared reading updates, conversations, shelves, and book finds will appear here.' : 'Explore a shelf, visit its reader’s profile, and follow them to bring their updates here.'}</p><button className="button primary" onClick={onExplore}>Explore shelves<ArrowUpRight size={15} /></button></div> : null}
       <div className={styles.stream}>{items.map(item => {
+        const conversationBook = item.book && (item.kind === 'reading' || item.kind === 'comment') ? conversationBooks.get(readingBookKey(item.book)) : undefined;
         const position = item.book ? readerPosition(item.book, state.books) : { progress: 0, unread: true };
         const guarded = hideUnread && position.unread || hideAhead && (item.progress ?? 0) > position.progress;
         return <article className={styles.card} key={item.kind + ':' + item.id}>
@@ -150,7 +158,7 @@ export default function FollowingFeed({ state, accountId, ready, flush, onOpenPr
           {item.book ? <div className={styles.bookHeading}><BookCover book={item.book} small /><div><h2>{item.book.title}</h2><p>{item.book.author}</p></div>{item.progress !== undefined ? <span className={styles.progress}>{Math.round(item.progress)}% through</span> : null}</div> : null}
           {item.body ? <SpoilerText body={item.body} progress={item.progress ?? 0} readerProgress={position.progress} unread={position.unread} defaultHide={guarded} /> : item.kind === 'reading' ? <p className={styles.progressOnly}>A new bookmark at {Math.round(item.progress ?? 0)}%.</p> : null}
           {item.shelf ? <a className={styles.shelfPreview} href={'/s/' + item.shelf.id}><div><ShelfCanvas shelf={item.shelf.shelf} books={item.shelf.books} compact /></div><h2>{item.shelf.shelf.title}</h2><p>{item.shelf.bookCount} books<ArrowUpRight size={15} /></p></a> : null}
-          {item.postId ? <footer className={styles.cardFooter}><a href={'/j/' + item.postId + (item.commentId ? '#comment-' + item.commentId : '')}><MessageCircle size={14} />Open conversation<ArrowUpRight size={13} /></a></footer> : null}
+          {item.postId || conversationBook && onReadTogether ? <footer className={styles.cardFooter}>{conversationBook && onReadTogether ? <button type="button" className={styles.readTogether} onClick={() => onReadTogether(conversationBook.id)}><Users size={14}/>Read together at my bookmark<ArrowUpRight size={13}/></button> : null}{item.postId ? <a href={'/j/' + item.postId + (item.commentId ? '#comment-' + item.commentId : '')}><MessageCircle size={14}/>{conversationBook && onReadTogether ? 'Open shared entry' : 'Open conversation'}<ArrowUpRight size={13}/></a> : null}</footer> : null}
         </article>;
       })}</div>
       {nextCursor ? <div className={styles.more}><button className="button secondary" onClick={() => void loadMore()} disabled={loadingMore || loading}>{loadingMore ? <LoaderCircle className="spin" size={15} /> : <ChevronDown size={15} />}More updates</button></div> : null}

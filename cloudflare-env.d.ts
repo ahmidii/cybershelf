@@ -4,5 +4,6 @@ declare namespace Cloudflare {
     BUCKET?: R2Bucket;
     APP_ORIGIN?: string;
     BETTER_AUTH_SECRET?: string;
+    HARDCOVER_CLIENT_ID?: string;
   }
 }

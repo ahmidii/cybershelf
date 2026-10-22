@@ -18,6 +18,9 @@ const source = z.object({
   if (v.kind === 'file' && !v.assetId) ctx.addIssue({code: z.ZodIssueCode.custom, message:'A file source needs an uploaded file', path:['assetId']});
 });
 const readingLogEntry=z.object({id:idSchema,body:text(4000),progress:z.number().min(0).max(100),page:z.number().int().min(0).max(100000).optional(),createdAt:date});
+const importedFields=z.object({title:text(500).optional(),author:text(500).optional(),coverUrl:imageUrl.optional(),isbn:text(32).optional(),pages:z.number().int().min(0).max(100000).optional(),status:z.enum(['unread','reading','read','paused','dnf']).optional(),progress:z.number().min(0).max(100).optional(),rating:z.number().min(0).max(5).nullable().optional()});
+const bookConnection=z.object({connectionId:idSchema,remoteId:idSchema,sourceId:idSchema,lastImported:importedFields});
+const libraryConnection=z.object({id:idSchema,provider:z.literal('hardcover'),accountKey:z.string().regex(/^[a-f0-9]{64}$/),label:z.string().min(1).max(80),autoSync:z.boolean(),syncProgress:z.boolean(),connectedAt:date,lastSyncedAt:date.optional(),lastSummary:z.object({added:z.number().int().min(0).max(2000),updated:z.number().int().min(0).max(2000),preserved:z.number().int().min(0).max(2000)}).optional()});
 const book = z.object({
   id: idSchema, title: z.string().min(1).max(500), author: text(500), coverUrl: imageUrl,
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/), isbn: text(32).optional(), description: text(10000).optional(),
@@ -27,6 +30,7 @@ const book = z.object({
   readingLog:z.array(readingLogEntry).max(200).optional(),
   progress: z.number().min(0).max(100), rating: z.number().min(0).max(5).nullable(),
   review: text(20000), notes: text(30000), addedAt: date, finishedAt: date.optional(), sources: z.array(source).max(30),
+  connections:z.array(bookConnection).max(20).optional(),
 });
 const item = z.object({
   id:idSchema, kind:z.enum(['book','decor']), bookId:idSchema.optional(), decor:z.enum(['plant','bear','robot','vase','bookend','image']).optional(),
@@ -43,13 +47,24 @@ const shelf = z.object({
 
 export const stateSchema = z.object({
   schemaVersion:z.literal(1), profile:z.object({name:z.string().min(1).max(80),bio:text(1000),featuredShelfId:idSchema.optional()}),
-  books:z.array(book).max(2000), shelves:z.array(shelf).max(100),
+  books:z.array(book).max(2000), shelves:z.array(shelf).max(100),connections:z.array(libraryConnection).max(10).optional(),
 }).superRefine((state, ctx) => {
+  const connectionIds=new Set<string>(),accountKeys=new Set<string>(),remoteRecords=new Set<string>();
+  for(const connection of state.connections??[]){
+    if(connectionIds.has(connection.id)||accountKeys.has(connection.accountKey))ctx.addIssue({code:z.ZodIssueCode.custom,message:'This account is already connected.'});
+    connectionIds.add(connection.id);accountKeys.add(connection.accountKey);
+  }
   const books = new Set<string>(),entryIds=new Set<string>();
   for (const b of state.books) {
     if (books.has(b.id)) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Duplicate book ID'});
     books.add(b.id);
     if (new Set(b.sources.map(s => s.id)).size !== b.sources.length) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Duplicate source ID'});
+    for(const link of b.connections??[]){
+      const key=link.connectionId+':'+link.remoteId;
+      if(!connectionIds.has(link.connectionId))ctx.addIssue({code:z.ZodIssueCode.custom,message:'A book refers to an unavailable connection.'});
+      if(remoteRecords.has(key))ctx.addIssue({code:z.ZodIssueCode.custom,message:'A connected book is linked more than once.'});
+      remoteRecords.add(key);
+    }
     for(const entry of b.readingLog??[]){if(entryIds.has(entry.id))ctx.addIssue({code:z.ZodIssueCode.custom,message:'Duplicate reading entry ID'});entryIds.add(entry.id);}
   }
   const shelves = new Set<string>();

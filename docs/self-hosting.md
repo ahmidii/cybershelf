@@ -129,3 +129,7 @@ Export JSON and original files from the original account first. Restoring JSON t
 Old Sites account IDs and new standalone account IDs are different ownership keys. Do not copy records between identities without an explicit verified mapping. Published snapshots should be created again from the restored library.
 
 The original `.openai/hosting.json` is retained for development history. The standalone `deploy` command does not publish to that Site or depend on its authentication boundary.
+
+## Optional book account connections
+
+Version 0.4 includes a browser-only Hardcover connector. Enable it once for your installation with a public OAuth application ID in the Worker runtime. No client secret, additional database, or background worker is needed. Follow [the account connection setup guide](account-connections.md#activate-hardcover-on-your-installation) for the exact callback, scopes, and `HARDCOVER_CLIENT_ID` setting. This is separate from Cybershelf’s own email/password sign-in and from a Cloudflare deployment API token.

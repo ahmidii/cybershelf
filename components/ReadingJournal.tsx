@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, BookOpen, Check, Globe, LoaderCircle, LockKeyhole, MessageCircle, PenLine, Plus, Trash2 } from 'lucide-react';
+import { ArrowUpRight, BookOpen, Check, Globe, LoaderCircle, LockKeyhole, MessageCircle, PenLine, Plus, Trash2, UsersRound } from 'lucide-react';
 import type { AppState, Book, ReadingPost } from '@/lib/types';
 import { uid } from '@/lib/types';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
@@ -19,6 +19,7 @@ interface Props {
   onOpenProfile: () => void;
   notify: (message: string) => void;
   initialBookId?: string;
+  onReadTogether?: (bookId: string) => void;
 }
 interface SharedEntry { id: string; bookId: string; entryId: string; published: boolean; publishedAt: string; }
 interface SharingState { posts: SharedEntry[]; profileId?: string; }
@@ -39,7 +40,7 @@ async function jsonRequest<T>(url: string, accountId: string, options: RequestIn
   return data as T;
 }
 
-export default function ReadingJournal({ state, update, accountId, ready, flush, onBookOpen, onOpenProfile, notify, initialBookId }: Props) {
+export default function ReadingJournal({ state, update, accountId, ready, flush, onBookOpen, onOpenProfile, notify, initialBookId, onReadTogether }: Props) {
   const firstBook = state.books.find(book => book.id === initialBookId) ?? state.books.find(book => book.status === 'reading') ?? state.books[0];
   const [bookId, setBookId] = useState(firstBook?.id ?? '');
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -164,6 +165,7 @@ export default function ReadingJournal({ state, update, accountId, ready, flush,
     {selected && draft ? <div className={styles.composer}>
       <div className={styles.composerHeading}><PenLine size={20}/><div><h2>Leave a little bookmark.</h2><p>A thought is optional. Your place in the book is enough.</p></div></div>
       <div className={styles.bookChooser}><button type="button" className={styles.coverButton} onClick={() => onBookOpen(selected.id)} aria-label={`Open ${selected.title}`}><BookCover book={selected} small/></button><label className="field">What are you reading?<select value={selected.id} disabled={!ready || !!busy} onChange={event => { setBookId(event.target.value); setError(''); }}>{state.books.map(book => <option key={book.id} value={book.id}>{book.title} — {book.author}</option>)}</select></label></div>
+      {onReadTogether && <button type="button" className={styles.togetherLink} onClick={() => onReadTogether(selected.id)}><UsersRound size={15}/><span>Read this book with your circle</span><ArrowUpRight size={13}/></button>}
       <div className={styles.markerRow}><div className={styles.modeSwitch} role="group" aria-label="Reading progress format"><button type="button" aria-pressed={draft.mode === 'page'} onClick={() => changeMode('page')} disabled={!!busy}>Page</button><button type="button" aria-pressed={draft.mode === 'percent'} onClick={() => changeMode('percent')} disabled={!!busy}>Percentage</button></div><label className={styles.markerInput}><span>{draft.mode === 'page' ? 'Page reached' : 'Percentage read'}</span><input aria-label={draft.mode === 'page' ? 'Page reached' : 'Percentage read'} type="number" inputMode="decimal" min="0" max={draft.mode === 'percent' ? 100 : selected.pages || 100000} step={draft.mode === 'page' ? 1 : .1} value={draft.marker} disabled={!!busy} onChange={event => setDraft({ marker: event.target.value })}/><span>{draft.mode === 'page' ? selected.pages ? `of ${selected.pages.toLocaleString()}` : 'pages' : '%'}</span></label></div>
       {draft.mode === 'page' && !selected.pages && <label className={styles.unknownProgress}>Progress at this page<input aria-label="Progress percentage at this page" type="number" min="0" max="100" step="0.1" value={draft.progress ?? String(selected.progress)} onChange={event => setDraft({ progress: event.target.value })} disabled={!!busy}/><span>%</span></label>}
       <p className={styles.progressHint}>{draft.mode === 'page' ? selected.pages ? `Calculated using the ${selected.pages.toLocaleString()} pages saved for this book. Adjust the page count in Book details if your copy differs.` : 'This edition’s page count is unknown. Set an approximate percentage as well, so readers know how far the thought reaches.' : 'This percentage stays with the entry, even as you read further.'}</p>
