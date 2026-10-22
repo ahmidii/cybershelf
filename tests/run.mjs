@@ -49,6 +49,8 @@ try {
     resolve(root, 'tests/spoilers.test.mjs'),
     resolve(root, 'lib/server/server.test.mjs'),
     resolve(root, 'lib/server/auth.test.mjs'),
+    resolve(root, 'tests/deployment-auth.test.mjs'),
+    resolve(root, 'tests/browser-draft.test.mjs'),
   ], { cwd: root, stdio: 'inherit' });
   if (result.error) throw result.error;
   if (result.status === 0) {

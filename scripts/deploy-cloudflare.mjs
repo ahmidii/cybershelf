@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { ensureAuthSecret } from './ensure-auth-secret.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const wrangler = fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js', import.meta.url));
@@ -39,4 +40,57 @@ if (!dryRun) {
   // Stop immediately on migration failure, keeping the previous Worker live.
   run(['d1', 'migrations', 'apply', 'DB', '--remote', '--config', 'wrangler.jsonc']);
 }
-run(['deploy', '--config', generatedConfig, ...(dryRun ? ['--dry-run'] : [])]);
+// Keep optional runtime configuration (for example the verified mail sender)
+// across builds. Explicit source vars such as APP_ORIGIN still take precedence.
+run(['deploy', '--config', generatedConfig, '--keep-vars', ...(dryRun ? ['--dry-run'] : [])]);
+
+if (!dryRun) {
+  // Deploy first so this also works for a fresh Worker. A missing key is then
+  // installed as an encrypted Worker secret; a configured key is never replaced.
+  // secret put deploys its new binding immediately. Only stdin carries the key.
+  const result = ensureAuthSecret({
+    buildSecret: process.env.BETTER_AUTH_SECRET,
+    configPath: generatedConfig,
+    accountsAvailable: await accountsReady(),
+    runPrivate(args, input) {
+      return spawnSync(process.execPath, [wrangler, ...args], {
+        cwd: root,
+        input,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 60_000,
+        maxBuffer: 1024 * 1024,
+        env: { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_SANITIZE: 'true', WRANGLER_WRITE_LOGS: 'false' },
+      });
+    },
+  });
+  console.log(result === 'created'
+    ? 'Account authentication is configured. The new secret is stored only in Cloudflare.'
+    : 'Existing account authentication setting preserved.');
+  if (!await accountsReady(result === 'created')) {
+    throw new Error('The Worker was published, but account configuration is still unavailable. Check runtime BETTER_AUTH_SECRET, DB, and APP_ORIGIN; an existing secret was not replaced.');
+  }
+  console.log('Live account configuration verified on the application origin.');
+}
+
+async function accountsReady(waitForAvailable = false) {
+  // A read-only, credential-free check also protects working legacy runtime
+  // keys from replacement. No keys, emails, cookies, or account rows are read.
+  const statusURL = new URL('/api/health', config.vars.APP_ORIGIN);
+  let observedStatus = false;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const response = await fetch(statusURL, { redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(10_000) });
+      if (response.ok) {
+        const data = await response.json();
+        if (typeof data?.accounts === 'boolean' && typeof data?.email === 'boolean') {
+          observedStatus = true;
+          if (data.accounts || !waitForAvailable) return data.accounts;
+        }
+      }
+    } catch { /* Only a generic deployment diagnostic may leave this function. */ }
+    if (attempt < 4) await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  if (observedStatus) return false;
+  throw new Error('The Worker was published, but its public account status could not be checked. No authentication key was replaced. Confirm APP_ORIGIN and the domain route, then retry deployment.');
+}

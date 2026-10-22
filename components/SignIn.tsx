@@ -45,11 +45,17 @@ function errorMessage(status: number, error: AuthError, mode: Mode): string {
   }
 }
 
-export default function SignIn({ returnTo, available }: { returnTo: string; available: boolean }) {
+export default function SignIn({ returnTo, available, emailAvailable, reauthenticate = false, initialEmail = '' }: {
+  returnTo: string;
+  available: boolean;
+  emailAvailable: boolean;
+  reauthenticate?: boolean;
+  initialEmail?: string;
+}) {
   const destination = safeRelativeReturnPath(returnTo);
   const [mode, setMode] = useState<Mode>('sign-in');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -92,6 +98,7 @@ export default function SignIn({ returnTo, available }: { returnTo: string; avai
       const response = await fetch(`/api/auth/${creating ? 'sign-up' : 'sign-in'}/email`, {
         method: 'POST',
         credentials: 'same-origin',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(creating
           ? { name: cleanName, email: cleanEmail, password }
@@ -148,14 +155,14 @@ export default function SignIn({ returnTo, available }: { returnTo: string; avai
       </section>
 
       <section className={styles.card} aria-labelledby="auth-heading">
-        <div className={styles.modeSwitch} role="group" aria-label="Account action">
+        {!reauthenticate && <div className={styles.modeSwitch} role="group" aria-label="Account action">
           <button type="button" aria-pressed={!creating} disabled={submitting} className={!creating ? styles.selectedMode : undefined} onClick={() => changeMode('sign-in')}>Sign in</button>
           <button type="button" aria-pressed={creating} disabled={submitting} className={creating ? styles.selectedMode : undefined} onClick={() => changeMode('sign-up')}>Create account</button>
-        </div>
+        </div>}
         <div className={styles.cardHeading}>
           <p className={styles.eyebrow}>YOUR READING CORNER</p>
-          <h1 id="auth-heading">{creating ? 'Make yourself at home.' : 'Welcome back.'}</h1>
-          <p>{creating ? 'Save your books, arrange your shelves, and make a little space of your own.' : 'Your library, your shelves, and your next chapter are waiting.'}</p>
+          <h1 id="auth-heading">{creating ? 'Make yourself at home.' : reauthenticate ? 'One quick check.' : 'Welcome back.'}</h1>
+          <p>{creating ? 'Save your books, arrange your shelves, and make a little space of your own.' : reauthenticate ? 'Sign in again before changing your account settings.' : 'Your library, your shelves, and your next chapter are waiting.'}</p>
         </div>
 
         {!available && <div className={styles.setupNotice} role="status">
@@ -184,7 +191,8 @@ export default function SignIn({ returnTo, available }: { returnTo: string; avai
               </div>
               {creating && <p id="auth-password-hint" className={styles.fieldHint}>At least {AUTH_PASSWORD_MIN_LENGTH} characters. A few memorable words work well.</p>}
             </div>
-            {creating && <p className={styles.recoveryNote}>Keep your password somewhere safe. Password reset is not available in this first edition.</p>}
+            {!creating && emailAvailable && <a className={styles.forgotLink} href="/forgot-password">Forgot your password?</a>}
+            {creating && <p className={styles.recoveryNote}>{emailAvailable ? 'We’ll send a link to verify your email. You can start making your shelf right away.' : 'Keep your password somewhere safe. Email recovery has not been enabled for this site yet.'}</p>}
             <button className={styles.submit} type="submit">
               {submitting ? <><LoaderCircle size={17} className={styles.spinner} aria-hidden="true"/>{creating ? 'Creating your account…' : 'Signing you in…'}</> : <>{creating ? 'Create my account' : 'Sign in'}<ArrowRight size={17} aria-hidden="true"/></>}
             </button>
@@ -195,6 +203,6 @@ export default function SignIn({ returnTo, available }: { returnTo: string; avai
       </section>
     </main>
 
-    <footer className={styles.footer}><span>cybershelf · first edition</span><span>A little space for your books.</span></footer>
+    <footer className={styles.footer}><span>cybershelf</span><span>A little space for your books.</span></footer>
   </div>;
 }

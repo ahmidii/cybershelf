@@ -4,8 +4,9 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../db/schema';
 import { AUTH_EMAIL_MAX_LENGTH, AUTH_NAME_MAX_LENGTH, AUTH_PASSWORD_MAX_LENGTH, AUTH_PASSWORD_MIN_LENGTH } from '../auth-contract';
+import { authEmailConfiguration, sendAuthEmail, type AuthEmailBindings, type AuthEmailPurpose } from './auth-email';
 
-export type AuthBindings = {
+export type AuthBindings = AuthEmailBindings & {
   DB?: D1Database;
   APP_ORIGIN?: string;
   BETTER_AUTH_SECRET?: string;
@@ -40,26 +41,52 @@ export function authConfiguration(bindings: AuthBindings) {
 
 // Construct inside the request context: D1 bindings are scoped to the Worker.
 // Never infer identity, trusted origins, or cookie configuration from headers.
-export function createAuth(bindings: AuthBindings) {
+export function createAuth(bindings: AuthBindings, waitUntil?: (promise: Promise<unknown>) => void) {
   const config = authConfiguration(bindings);
+  const emailConfig = authEmailConfiguration(bindings);
   const db = drizzle(config.database, { schema });
+  const queueEmail = async (purpose: AuthEmailPurpose, data: { user: { email: string }; url: string }) => {
+    if (!emailConfig) return;
+    const delivery = sendAuthEmail(emailConfig, { purpose, to: data.user.email, origin: config.origin, url: data.url }).catch(() => {
+      // Never disclose account existence through provider errors or log links,
+      // addresses, credentials, provider payloads, or reset/verification tokens.
+      console.error('cybershelf account email delivery failed');
+    });
+    if (waitUntil) waitUntil(delivery);
+    else await delivery;
+  };
   return betterAuth({
     appName: 'cybershelf',
     baseURL: config.origin,
     basePath: '/api/auth',
     secret: config.secret,
     trustedOrigins: [config.origin],
+    // Dependency errors can include database parameters. Keep production auth
+    // diagnostics useful without emitting account details or credential material.
+    logger: { level: 'error', log: () => console.error('cybershelf authentication service reported an error') },
     database: drizzleAdapter(db, { provider: 'sqlite', schema, transaction: false }),
     emailAndPassword: {
       enabled: true,
       minPasswordLength: AUTH_PASSWORD_MIN_LENGTH,
       maxPasswordLength: AUTH_PASSWORD_MAX_LENGTH,
       autoSignIn: true,
-      // Basic accounts work without an email service. Addresses remain
-      // unverified; verification and password recovery are not advertised.
+      // Keep existing accounts usable while confirmation is introduced. Email
+      // readiness is separate from account readiness; no-mail installs still work.
       requireEmailVerification: false,
       revokeSessionsOnPasswordReset: true,
+      ...(emailConfig ? {
+        resetPasswordTokenExpiresIn: 60 * 60,
+        sendResetPassword: (data: { user: { email: string }; url: string }) => queueEmail('password-reset', data),
+      } : {}),
     },
+    ...(emailConfig ? { emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: false,
+      // Confirmation must not silently replace another account's browser session.
+      autoSignInAfterVerification: false,
+      expiresIn: 60 * 60 * 24,
+      sendVerificationEmail: (data: { user: { email: string }; url: string }) => queueEmail('verify-email', data),
+    } } : {}),
     account: { accountLinking: { enabled: false } },
     session: {
       expiresIn: 60 * 60 * 24 * 30,
@@ -74,6 +101,10 @@ export function createAuth(bindings: AuthBindings) {
       customRules: {
         '/sign-up/email': { window: 60, max: 5 },
         '/sign-in/email': { window: 60, max: 10 },
+        '/request-password-reset': { window: 60, max: 3 },
+        '/send-verification-email': { window: 60, max: 3 },
+        '/reset-password': { window: 60, max: 5 },
+        '/change-password': { window: 60, max: 5 },
       },
     },
     advanced: {
@@ -81,6 +112,7 @@ export function createAuth(bindings: AuthBindings) {
       useSecureCookies: config.secureCookies,
       defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', path: '/' },
       ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] },
+      ...(waitUntil ? { backgroundTasks: { handler: waitUntil } } : {}),
     },
     databaseHooks: {
       user: {

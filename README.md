@@ -4,10 +4,11 @@ A place to collect books, arrange personal shelves, and keep a reading life with
 
 cybershelf separates a **Library** from the shelves you make with it. A book can be something you own, borrowed, have read, or simply want to remember. Add it once, then display it on as many themed shelves as you like. The `cybershe\f` wordmark and `||\` icon echo upright and leaning books, paired with a consistent serif-and-sans interface.
 
-This repository contains version 0.5: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
+This repository contains version 0.6: a React application, its server API, database migrations, and a standalone Cloudflare deployment with email/password accounts, account security settings, and optional email recovery. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status.
 
 ## What you can do
 
+- **Keep your account within reach:** create an account, save a private library across devices, change your password, and sign out other devices from Account & security. Email confirmation and password recovery become available when the owner configures a verified mail sender.
 - **Explore a book:** open a shareable page with its synopsis, author, available editions, and Cybershelf community ratings and completed reads. Pick an edition for its ISBN and page count, or add the work directly to your private library.
 - **Collect books:** search book metadata, enter a title manually, import a Goodreads CSV, or upload an EPUB/PDF. File imports can attach another original to an existing book without replacing its reviews or notes.
 - **Make several shelves:** name and duplicate them, choose Open shelves, Cubby, or Tower, and combine Spines together, Gallery, or Stacks layouts with Paper, Warm oak, Moss, or Ink finishes.
@@ -25,7 +26,7 @@ This repository contains version 0.5: a React application, its server API, datab
 - **Share deliberately:** publish a shelf snapshot, browse published shelves, save an interesting title, or make your own version of another shelf's arrangement. Custom artwork stays with its owner when a shelf is copied.
 - **Take your data with you:** export catalog/shelves as JSON, reading records as CSV, and uploaded originals in a ZIP backup.
 
-The guest preview is labelled sample content. Editing as a guest creates a draft in that browser. Sign in to save an account library across devices, upload files, and publish shelves. A browser draft is not a substitute for an account backup.
+The guest preview is labelled sample content. Editing as a guest creates a draft in that browser. Sign in to save an account library across devices, upload files, and publish shelves. Importing a browser draft into an untouched account preserves the signup name and removes the local draft only after a successful save. A customized account collection is never replaced by this shortcut. A browser draft is not a substitute for an account backup.
 
 ## What this release does not connect automatically
 
@@ -120,9 +121,9 @@ This release restores the catalog JSON, not the ZIP as a single operation. For a
 
 The current runtime is Vinext on Cloudflare Workers, with D1 for account records and publication snapshots and R2 for uploaded files. GitHub stores and collaborates on the source; a static GitHub Pages deployment alone cannot run these authenticated APIs.
 
-Standalone hosting is configured in `wrangler.jsonc`: Worker `cybershelf`, D1 `cybershelf-db` as `DB`, private R2 `cybershelf-files` as `BUCKET`, and the `cybershelf.io` custom domain. The deploy script applies pending migrations before publishing the built Worker. Follow the [Cloudflare setup guide](docs/self-hosting.md) for the GitHub connection, build-token permission, and required `BETTER_AUTH_SECRET`. Forks must replace the resource identifiers and domain with their own.
+Standalone hosting is configured in `wrangler.jsonc`: Worker `cybershelf`, D1 `cybershelf-db` as `DB`, private R2 `cybershelf-files` as `BUCKET`, and the `cybershelf.io` custom domain. The deploy script applies pending migrations, publishes the built Worker, and configures a missing authentication secret through Cloudflare's encrypted runtime-secret API. Configured keys are preserved. It then checks the application's public account capability flags. Follow the [Cloudflare setup guide](docs/self-hosting.md) for the GitHub connection, build-token permission, and email activation. Forks must replace the resource identifiers and domain with their own.
 
-Accounts use Better Auth with database-backed sessions and rate limiting. Requests cannot establish identity by supplying legacy hosting headers. This release does not send verification or password-reset emails; readers should keep their passwords in a password manager. Adding recovery requires an email delivery service and an explicit recovery flow.
+Accounts use Better Auth with database-backed sessions and rate limiting. Requests cannot establish identity by supplying legacy hosting headers. Account settings require the current password for password changes, and support revoking other sessions. Resend-based confirmation and recovery are implemented and tested with a local mail sink; production email requires `RESEND_API_KEY` and `AUTH_EMAIL_FROM` with a verified sending domain. Until configured, signup remains usable and the interface clearly says email recovery is unavailable. Reset links expire after one hour and revoke existing sessions when used. [Enable account email](docs/self-hosting.md#6-enable-account-email).
 
 For changes, read [CONTRIBUTING.md](CONTRIBUTING.md), [architecture](docs/architecture.md), and [CHANGELOG.md](CHANGELOG.md).
 

@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { signInPath } from '../lib/auth-contract';
 import { AuthConfigurationError, authConfiguration, createAuth } from '../lib/server/auth';
+import { authEmailConfiguration } from '../lib/server/auth-email';
 
 export type CurrentUser = {
   userId: string;
@@ -12,12 +13,12 @@ export type CurrentUser = {
   emailVerified: boolean;
 };
 
-export function getAuthAvailability(): { available: boolean } {
+export function getAuthAvailability(): { available: boolean; emailAvailable: boolean } {
   try {
     authConfiguration(env);
-    return { available: true };
+    return { available: true, emailAvailable: !!authEmailConfiguration(env) };
   } catch (error) {
-    if (error instanceof AuthConfigurationError) return { available: false };
+    if (error instanceof AuthConfigurationError) return { available: false, emailAvailable: false };
     throw error;
   }
 }

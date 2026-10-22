@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.6.0 — Your account, everywhere — 2026-10-22
+
+### Added
+
+- A private Account & security page with email identity, actual verification status, current-password changes, and signing out other devices.
+- Email confirmation and one-hour, single-use password reset flows, activated by a verified Resend sender. Existing sessions are revoked on reset; confirmation never signs in or switches accounts automatically.
+- Accessible recovery screens, password confirmation/visibility controls, expired-link handling, and a sign-in-again route for older sessions.
+- A deployment-only first-use authentication-secret initializer. Existing encrypted keys and working legacy runtime keys are preserved; missing keys use a valid build value or secure random generation, sent to Cloudflare through stdin without logs or files.
+- Public boolean account/email capability checks, focused deployment/draft regressions, and a real-Worker account lifecycle suite with an in-memory mail sink.
+
+### Fixed
+
+- Disabled sign-in after a successful application build when the authentication setting exists only in the build environment instead of the Worker runtime.
+- Optional runtime variables disappearing on subsequent source deployments.
+- Guest imports overwriting the signup name or customized bookless shelves. The local draft is removed only after the account save succeeds.
+- Failed saves preventing signout: readers can export the draft or explicitly discard unsaved work and sign out.
+- Concurrent library flushes starting duplicate writes with the same revision.
+
+### Boundaries
+
+- Email recovery is implemented but requires the owner to configure a verified sender and test their own inbox. Without mail configuration, signup/signin still work and the limitation is visible.
+- Existing readers are not forced to verify before signing in. Email-address changes and automatic account linking remain disabled.
+- No new database migration, dependency, or Cloudflare resource is required for the account code. Mail-provider activation is separate from the website deployment.
+
 ## 0.5.0 — A page for every book — 2026-10-22
 
 ### Added

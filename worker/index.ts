@@ -1,4 +1,5 @@
 import handler from "vinext/server/fetch-handler";
+import { runWithExecutionContext } from "vinext/shims/request-context";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 
@@ -23,8 +24,9 @@ const worker = {
         },
       };
     }
-    const response = await runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
-    if (new URL(request.url).pathname === '/connect/hardcover') {
+    const response = await runWithExecutionContext<Response>(ctx, () => runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx)));
+    const pathname = new URL(request.url).pathname.replace(/\/+$/, '');
+    if (['/connect/hardcover', '/signin', '/account', '/forgot-password', '/reset-password'].includes(pathname) || pathname.startsWith('/api/auth/')) {
       const headers = new Headers(response.headers);
       headers.set('Referrer-Policy', 'no-referrer');
       headers.set('Cache-Control', 'private, no-store');

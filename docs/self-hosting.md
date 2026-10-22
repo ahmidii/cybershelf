@@ -55,7 +55,15 @@ If you use a separately created token, select it in the Worker's build settings 
 
 Reference: [Workers Builds API-token permissions](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/), and [Worker authorization](https://developers.cloudflare.com/workers/authorization/).
 
-## 3. Add the authentication secret
+## 3. Authentication secret and runtime settings
+
+`pnpm run deploy` now initializes a missing authentication key after publishing the Worker. It checks the deployed Worker's secret names, preserves an existing encrypted `BETTER_AUTH_SECRET`, and also preserves a working legacy runtime key. If the key is absent, it promotes a valid build-only `BETTER_AUTH_SECRET` when supplied, or generates 48 cryptographically random bytes. The value is passed to Wrangler through stdin, kept out of command arguments/output/files, and stored as an encrypted Worker secret. Private secret commands disable Wrangler's debug-file logging.
+
+Deployments preserve optional dashboard variables through `--keep-vars`; source-controlled values such as `APP_ORIGIN` still take precedence. The final read-only `/api/health` check reports only whether account and email configuration is available. It does not reveal secrets, users, or database records, and it does not prove inbox delivery or a full signup transaction.
+
+Keep the first deployment sequential: first-time key initialization is a check followed by a write, not an atomic create-only operation. Normal subsequent builds preserve the configured key. If the status check, secret-list permission, or secret upload fails, deployment reports that failure rather than printing private diagnostics or silently replacing an existing key. An existing short/invalid secret is deliberately left for the owner to repair.
+
+To configure or repair the key manually:
 
 Open **Workers & Pages → cybershelf → Settings → Variables and Secrets → Add**:
 
@@ -71,7 +79,7 @@ Generate it locally with your password manager, or with Node:
 node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"
 ```
 
-Store that result privately and paste it into Cloudflare. Choose **Deploy** when saving the secret. It is a Worker runtime secret, not a public `VITE_` variable and not merely a build environment variable. Keep the same value across future deployments; changing it invalidates existing sessions.
+Store that result privately and paste it into Cloudflare. Choose **Deploy** when saving the secret. It is a Worker runtime secret, not a public `VITE_` variable. Keep the same value across future deployments; changing it invalidates existing sessions. If moving an existing plaintext key to an encrypted binding, retain its value rather than generating a replacement.
 
 `APP_ORIGIN=https://cybershelf.io` is already in the source configuration. Wrangler preserves previously configured secrets on deployment. Without a valid secret, the guest app can load but account creation and sign-in remain unavailable.
 
@@ -93,15 +101,39 @@ Reference: [Worker Custom Domains](https://developers.cloudflare.com/workers/con
 
 Open the custom domain, create an account, add a book and a shelf, and reload to confirm they persist. Upload a small EPUB/PDF and retrieve it through **Grab this book**. Sign out and sign back in. Publish a shelf and open its share link in a signed-out window; that link should show the chosen shelf without private notes, source links, or book originals.
 
-If a private API reports a database error, check that both committed migrations completed successfully. If authentication is unavailable, check the runtime secret and exact origin. If requests fail with a Worker CPU-limit error, inspect Cloudflare's invocation metrics and plan limits. The Free plan has a small per-request CPU allowance; a local test does not establish that a complete production auth request fits it. The maintained authentication dependency uses native scrypt on Workers, without reducing password-hash strength to meet a plan limit.
+If a private API reports a database error, check that all seven committed migrations completed successfully. If authentication is unavailable, check the runtime secret and exact origin. If requests fail with a Worker CPU-limit error, inspect Cloudflare's invocation metrics and plan limits. The Free plan has a small per-request CPU allowance; a local test does not establish that a complete production auth request fits it. The maintained authentication dependency uses native scrypt on Workers, without reducing password-hash strength to meet a plan limit.
 
 Reference: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+
+## 6. Enable account email
+
+Basic accounts do not require a mail provider. Password recovery and confirmation use [Resend](https://resend.com/docs/send-with-cloudflare-workers), which requires an API key and a verified sending domain.
+
+1. Add `cybershelf.io` (or your own domain in a fork) in Resend's Domains dashboard. Add the exact DNS records Resend supplies in Cloudflare, and wait for its verified status. Do not overwrite unrelated existing mail records.
+2. Create an API key with sending access to that domain. Keep it private; it does not belong in GitHub, screenshots, or chat.
+3. In **Workers & Pages → cybershelf → Settings → Variables and Secrets**, add:
+
+   | Name | Type | Value |
+   | --- | --- | --- |
+   | `RESEND_API_KEY` | Secret | The sending API key from Resend |
+   | `AUTH_EMAIL_FROM` | Text | `cybershelf <accounts@cybershelf.io>` |
+
+4. Choose **Deploy** to apply the runtime settings. These settings survive later GitHub deployments. A syntax-valid configuration enables the UI; it cannot establish whether the provider has verified the sender or will deliver to a particular inbox.
+5. With your own account, use **Account & security → Send verification link** and confirm the message. Then request a reset for your own address and check inbox/spam delivery. Never use another reader's email as a deployment test.
+
+The app sends a confirmation link on signup after email is enabled. Confirmation remains optional for sign-in so existing readers are not locked out. Email confirmation does not create a session or switch the current account. Password reset links expire after one hour, can only be used once, and revoke existing sessions; the reader signs in again with the new password. Verification links expire after 24 hours.
+
+Reset requests use the same response for known and unknown addresses. Provider delivery errors are logged as a fixed message without addresses, tokens, keys, or provider payloads. Messages run through the Worker's `waitUntil` lifecycle. Auth/recovery pages use no-store, no-referrer, and noindex protections. `email: true` in `/api/health` means the two settings are syntactically ready, not that a message reached an inbox.
+
+References: [Better Auth email/password](https://better-auth.com/docs/authentication/email-password), [Resend API](https://resend.com/docs/api-reference/emails/send-email), and [Cloudflare secrets](https://developers.cloudflare.com/workers/configuration/secrets/).
 
 ## Account behavior and current limits
 
 Accounts use Better Auth, signed HTTP-only cookies, database-backed sessions, and database-backed authentication rate limits. Sign-out is a POST. Raw identity headers cannot authenticate a request. A separate account precondition prevents an old tab from saving into another account after a session switch.
 
-This release supports email/password signup and sign-in without an external email service. **Email verification and forgotten-password recovery are not configured.** Addresses remain unverified and automatic account linking is disabled. The signup screen explains the recovery limitation. Add an actual mail provider and tested recovery flow before promising those features.
+This release supports email/password signup and sign-in without an external email service. The account page supports password changes and signing out other devices. Password changes require the current password and revoke other sessions; an older session can sign in again through the explicit reauthentication flow. Automatic account linking and email-address changes remain disabled.
+
+**Production email remains an owner activation step.** Until the provider settings above are present, the interface says verification/recovery are unavailable. Do not advertise delivered recovery email until your own inbox test passes. Browser-draft imports preserve the account name, and failed library saves offer an export or explicit discard before signout.
 
 The application limits in the README still apply. Keep backups of both D1 and R2: a database backup has file references, not the uploaded bytes. Password/session records are sensitive and should not be included in public debugging output.
 
