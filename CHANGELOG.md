@@ -12,6 +12,8 @@
 - Continuous coordinates and stack relationships survive saved libraries, backups, public shelf/profile snapshots, shelf duplication, and copied arrangements. Old arrangements and backups remain supported; no database migration is needed.
 - Added the `||\` icon and favicon, with `cybershe\f` as the wordmark.
 - Preserved intervening moves when a decoration upload finishes, pruned deleted books from undo history, and cleared stale previews/history when replacing or reloading a catalog.
+- Reserved scrolling space above the floating pose controls so the final shelf row and its actions remain reachable.
+- Kept pointer capture on the staging tray throughout a drag and suppressed native browser dragging, matching the direct shelf controls.
 
 
 ## 0.2.0 — Shelves with character, reading with company — 2026-10-22

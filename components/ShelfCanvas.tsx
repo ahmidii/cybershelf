@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { assetUrl, type Book, type PublicBook, type Shelf, type ShelfItem } from '../lib/types';
 import { bookDimensions } from '../lib/book-size';
@@ -262,7 +262,11 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
     session.gripYmm = (rect?.height ? clamp((rect.bottom - point.y) / rect.height, 0, 1) : .45) * size.height;
     interaction.current = session;
     setMode(session.mode); wheel.current = { total: 0, at: 0, eventAt: 0, direction: 0 };
-    try { canvasRef.current?.setPointerCapture(pointerId); } catch { /* Window listeners also cover an externally started pointer. */ }
+    // The tray captures its pointer synchronously and stays mounted throughout
+    // the preview. Keep that capture rather than transferring it after render.
+    if (!external) {
+      try { canvasRef.current?.setPointerCapture(pointerId); } catch { /* Window listeners still track the active pointer. */ }
+    }
   };
   const startLift = (itemId: string, kind: 'keyboard' | 'tap') => {
     const context = latest.current, pose = currentPose(itemId);
@@ -407,7 +411,7 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   useEffect(() => {
     if (!interaction.current) { setMode('auto'); setDismissedId(null); }
   }, [selectedId]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (externalDrag && interactive) startPointer(externalDrag.itemId, externalDrag.pointerId, { x: externalDrag.clientX, y: externalDrag.clientY }, externalDrag.pointerType || 'mouse', true);
   }, [externalDrag, interactive]);
 

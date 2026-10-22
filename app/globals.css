@@ -20,6 +20,9 @@
 .brand-symbol { display: inline-block; width: 28px; height: 28px; flex-shrink: 0; vertical-align: middle; }
 .brand-wordmark { white-space: nowrap; font-family: var(--serif); font-weight: 400; letter-spacing: -.035em; }
 .brand-slash { display: inline; margin: 0 .015em; }
+/* Keep the last shelf row and its actions reachable above the floating palette. */
+html:has([data-shelf-controls]) { scroll-padding-bottom: 210px; }
+body:has([data-shelf-controls]) .workspace { padding-bottom: calc(230px + env(safe-area-inset-bottom)); }
 .sidebar .brand-symbol { width: 30px; height: 30px; }
 .sidebar-caption { font-family: var(--sans); font-size: 11px; letter-spacing: 0; line-height: 1.7; color: #77816f; margin-top: 12px; }
 .main-nav > button { font-size: 13px; min-height: 43px; }
