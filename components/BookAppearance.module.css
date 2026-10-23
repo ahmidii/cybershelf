@@ -18,5 +18,56 @@
 .spineUpload p{font-size:11px;line-height:1.7;color:#6c7668}
 .journalCallout{padding-bottom:23px;margin-bottom:22px;border-bottom:1px solid var(--line)}
 .journalCallout p{margin-top:11px;line-height:1.8}
+.spinePanel{margin:20px 0 14px;border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:22px}
+.spineOverview{display:flex;align-items:center;gap:28px;min-width:0}
+.spinePreview{position:relative;flex-shrink:0;height:180px;margin:0 14px;overflow:hidden;border:1px solid #00000016;border-radius:2px 4px 3px 1px;background:linear-gradient(90deg,#0000001f,transparent 18%,#ffffff12 26%,transparent 82%,#00000015),var(--spine-color,#78836b);box-shadow:3px 5px 9px #30291f20;color:var(--spine-ink,#fff9ec)}
+.spinePreview>img{display:block;width:100%;height:100%;object-fit:fill}
+.spinePreview>span{display:flex;position:absolute;inset:12px 3px;align-items:center;justify-content:center;gap:10px;writing-mode:vertical-rl;transform:rotate(180deg);overflow:hidden}
+.spinePreview strong{font-family:var(--serif,Georgia,serif);font-weight:400;font-size:13px;white-space:nowrap;max-height:100%;overflow:hidden;text-overflow:ellipsis}
+.spinePreview small{font-family:var(--sans,Arial,sans-serif);font-size:8px;white-space:nowrap;max-height:40%;overflow:hidden;text-overflow:ellipsis}
+.spineCopy{flex:1;min-width:0}
+.spineBadge{display:inline-block;padding:4px 7px;border-radius:4px;background:#e9ede4;color:#52634a;font-size:10px;font-weight:600;letter-spacing:.03em}
+.spineCopy h4{font-family:var(--serif,Georgia,serif);font-size:22px;font-weight:400;line-height:1.2;margin:11px 0 8px;letter-spacing:-.025em}
+.spineCopy>p{font-size:12px;line-height:1.7;margin:0 0 9px;color:#687360}
+.editionLabel{display:block;font-size:10px;line-height:1.6;color:#78806f;overflow-wrap:anywhere}
+.spineButtons{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:15px}
+.spineButtons>label{cursor:pointer;min-height:42px}
+.spineButtons>label:focus-within{outline:2px solid #6f8365;outline-offset:3px}
+.spineButtons>label.disabled{opacity:.55;cursor:wait}
+.removeSpine{display:block;min-height:40px;margin-top:4px;padding:6px 0;color:#6c7668;text-decoration:underline;text-underline-offset:3px;text-decoration-color:#b5beab;font-size:11px;background:none;border:0;cursor:pointer}
+.spineCopy .signInHint{margin-top:12px;font-size:11px}
+.spineLink{margin:20px 0 0;padding-top:16px;border-top:1px solid var(--line)}
+.spineLink summary{display:flex;align-items:center;gap:8px;min-height:36px;font-size:11px;color:#53604c;list-style:none;cursor:pointer}
+.spineLink summary::-webkit-details-marker{display:none}
+.spineLink summary>svg:last-child{margin-left:auto;transition:transform .18s ease}
+.spineLink[open] summary>svg:last-child{transform:rotate(180deg)}
+.spineLink>div{display:flex;align-items:flex-end;gap:10px;margin:12px 0 8px}
+.spineLink>div>label{flex:1;min-width:0;margin:0}
+.spineLink>div>button{flex-shrink:0;min-height:40px}
+.spineLink .hint{font-size:10px;margin-bottom:0}
+.spineSourceNote{font-size:10px;line-height:1.7;color:#7d8575;margin:12px 0 0}
+.cropEditor{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.cropHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 8px}
+.cropHeading strong{font-size:13px;font-weight:600;color:var(--ink)}
+.cropHeading>span{font-size:10px;color:#7d8575}
+.cropEditor>.hint{margin-bottom:13px}
+.cropStage{position:relative;width:100%;height:300px;border:1px solid var(--line);border-radius:8px;background:#dcded5;overflow:hidden;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.cropStage:active{cursor:grabbing}
+.cropStage:focus-visible{outline:2px solid #6f8365;outline-offset:3px}
+.cropPhoto{position:absolute;left:50%;top:50%;max-width:none!important;max-height:none!important;pointer-events:none;user-select:none;transform-origin:center}
+.cropFrame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:1px solid #fffdf4;box-shadow:0 0 0 9999px #1e2b1ecc;pointer-events:none}
+.cropFrame>i{position:absolute;width:9px;height:9px;border:2px solid #fffdf4}
+.cropFrame>i:nth-child(1){top:-2px;left:-2px;border-bottom:0;border-right:0}.cropFrame>i:nth-child(2){top:-2px;right:-2px;border-bottom:0;border-left:0}
+.cropFrame>i:nth-child(3){bottom:-2px;left:-2px;border-top:0;border-right:0}.cropFrame>i:nth-child(4){bottom:-2px;right:-2px;border-top:0;border-left:0}
+.cropLoading{position:absolute;inset:20px;display:flex;align-items:center;justify-content:center;gap:9px;color:#687360;font-size:12px;text-align:center;line-height:1.6}
+.cropSliders{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:17px}
+.cropSliders label{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;font-size:11px;color:#58664e}
+.cropSliders label>span{font-variant-numeric:tabular-nums;color:#7d8575}
+.cropSliders input{display:block;width:100%;height:40px;margin:0;padding:0!important;accent-color:#52634a;cursor:pointer;background:transparent}
+.cropActions{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px}
+.cropActions button{min-height:44px}
+.cropSaveActions{margin-left:auto;display:flex;gap:6px;align-items:center}
+.cropPrivacy{font-size:10px;line-height:1.6;color:#7d8575;margin:12px 0 0}
 @media(max-width:480px){.appearance summary{padding:15px 13px}.body{padding:4px 13px 15px}.measurements{gap:8px}.measurements label{font-size:10px}.measurements input{padding-left:8px!important}.inputUnit>span{right:7px}.appearance summary small{font-size:10px}}
-@media(prefers-reduced-motion:reduce){.appearance summary>svg:last-child{transition:none}}
+@media(max-width:480px){.spinePanel{padding:16px 13px}.spineOverview{gap:17px}.spinePreview{margin:0 5px;height:165px}.spineCopy h4{font-size:20px}.spineCopy>p{font-size:11px}.spineButtons{gap:3px}.spineButtons>label{min-height:44px;padding:9px 10px!important}.spineLink>div{flex-direction:column;align-items:stretch}.spineLink>div>button{align-self:flex-end}.cropStage{height:280px}.cropSliders{gap:16px}.cropSaveActions{width:100%;justify-content:flex-end;margin-top:4px}.cropHeading>span{font-size:9px}.cropActions{gap:3px}}
+@media(prefers-reduced-motion:reduce){.appearance summary>svg:last-child,.spineLink summary>svg:last-child{transition:none}}

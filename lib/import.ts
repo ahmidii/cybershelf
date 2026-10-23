@@ -155,6 +155,19 @@ export function parseGoodreadsCSV(text: string): { books: Book[]; warnings: stri
     if (readingLog) { try { book.readingLog = parseReadingLog(JSON.parse(readingLog), `${title} reading log`); } catch { warnings.push(`“${title}”: an invalid reading log was skipped. The book and its other reading details were kept.`); } }
     const progress = Number(get('progress').replace('%', ''));
     book.progress = book.status === 'read' ? 100 : Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
+    const currentPage = get('current page');
+    if (currentPage) {
+      const page = Number(currentPage);
+      if (Number.isInteger(page) && page >= 0 && page <= (book.pages || 100000)) {
+        book.currentPage = page;
+        if (book.pages && !get('progress')) {
+          book.progress = page / book.pages * 100;
+          if (book.status === 'read' && book.progress < 100) { book.status = 'reading'; book.finishedAt = undefined; }
+          else if (book.progress === 100) book.status = 'read';
+          else if (book.status === 'unread' && page > 0) book.status = 'reading';
+        }
+      } else warnings.push(`“${title}”: an invalid current page was skipped. Its reading progress was kept.`);
+    }
     books.push(book);
   }
   const merged = mergeBooks([], books);
@@ -378,6 +391,10 @@ export function parseCatalogJSON(text: string): AppState {
     if (data.pages !== undefined) {
       book.pages = number(data.pages, `${context} pages`, 0, 100000);
       if (!Number.isInteger(book.pages)) throw new Error(`Invalid backup: ${context} pages must be a whole number.`);
+    }
+    if (data.currentPage !== undefined) {
+      book.currentPage = number(data.currentPage, `${context} current page`, 0, 100000);
+      if (!Number.isInteger(book.currentPage)) throw new Error(`Invalid backup: ${context} current page must be a whole number.`);
     }
     if (data.finishedAt !== undefined) book.finishedAt = date(data.finishedAt, `${context} finished date`);
     if (data.connections !== undefined) book.connections = list(data.connections, 'linked account records', 20).map(raw => {

@@ -1,4 +1,5 @@
 import type { Book, PublicBook } from './types';
+import { displayReadingProgress } from './reading-progress';
 
 const normalized = (value: string) => value.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
 
@@ -16,7 +17,7 @@ export function readerPosition(book: PublicBook, books: Book[]): { progress: num
 }
 
 export function progressLabel(progress: number, page?: number): string {
-  const percentage = Math.round(Math.min(100, Math.max(0, progress)) * 10) / 10;
+  const percentage = displayReadingProgress(progress);
   return page === undefined ? `${percentage}%` : `Page ${page} · ${percentage}%`;
 }
 

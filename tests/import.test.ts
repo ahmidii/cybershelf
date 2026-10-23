@@ -74,6 +74,30 @@ test('JSON backup round-trips, strips sharing identity, and retains private file
   assert.equal(parsed.books.length, state.books.length);
 });
 
+test('exact page bookmarks survive JSON and CSV backups without percentage rounding', () => {
+  const state = createDemoState(), book = state.books[0];
+  book.status = 'reading'; book.pages = 333; book.currentPage = 100; book.progress = 100 / 333 * 100;
+  const restored = parseCatalogJSON(catalogJSON(state)).books[0];
+  assert.equal(restored.currentPage, 100); assert.equal(restored.pages, 333); assert.equal(restored.progress, book.progress);
+  const csv = parseGoodreadsCSV(catalogCSV([book]));
+  assert.deepEqual(csv.warnings, []);
+  assert.equal(csv.books[0].currentPage, 100); assert.equal(csv.books[0].progress, book.progress);
+  const zero = parseGoodreadsCSV('Title,Number of Pages,Current Page\nA book,300,0\n').books[0];
+  assert.equal(zero.currentPage, 0); assert.equal(zero.progress, 0);
+  const pageOnly = parseGoodreadsCSV('Title,Number of Pages,Current Page\nA book,300,150\n').books[0];
+  assert.equal(pageOnly.currentPage, 150); assert.equal(pageOnly.progress, 50); assert.equal(pageOnly.status, 'reading');
+});
+
+test('invalid backup page markers are rejected and invalid CSV markers do not erase progress', () => {
+  const state = createDemoState();
+  for (const page of [-1, 1.5, 100001]) {
+    state.books[0].currentPage = page;
+    assert.throws(() => parseCatalogJSON(catalogJSON(state)), /current page/);
+  }
+  const csv = parseGoodreadsCSV('Title,Number of Pages,Current Page,Progress\nA book,300,301,25\n');
+  assert.equal(csv.books[0].currentPage, undefined); assert.equal(csv.books[0].progress, 25); assert.equal(csv.warnings.length, 1);
+});
+
 test('JSON restores published cover references and zero-page metadata within server limits', () => {
   const state = createDemoState();
   state.books[0].coverUrl = '/api/publications/shared_shelf/assets/public_cover'; state.books[0].pages = 0;

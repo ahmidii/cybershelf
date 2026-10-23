@@ -7,6 +7,8 @@ import { uid } from '@/lib/types';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { appendReadingEntry, makeReadingEntry, readingMarker, READING_THOUGHT_LIMIT } from '@/lib/reading-log';
 import { readingBookKey, readingDate } from '@/lib/reading';
+import { bookReadingProgress, currentReadingPage, displayReadingProgress, readingInputPages } from '@/lib/reading-progress';
+import ReadingProgressInput from './ReadingProgressInput';
 import type { ReadingRoomCommentsResponse, ReadingRoomOrder, ReadingRoomResponse } from '@/lib/reading-room';
 import BookCover from './BookCover';
 import ReadingJournal from './ReadingJournal';
@@ -25,10 +27,10 @@ interface Props {
   initialBookId?: string;
 }
 
-const percentage = (value: number) => Math.round(value * 10) / 10;
-const bookProgress = (book: Book) => book.status === 'read' ? 100 : Math.min(100, Math.max(0, book.progress));
+const percentage = displayReadingProgress;
+const bookProgress = bookReadingProgress;
 const bookmarkLabel = (book: Book, progress: number) => book.pages
-  ? `page ${Math.round(book.pages * progress / 100)} of ${book.pages.toLocaleString()}`
+  ? `page ${currentReadingPage(book) ?? 0} of ${book.pages.toLocaleString()}`
   : `${percentage(progress)}%`;
 
 class RoomRequestError extends Error {
@@ -70,9 +72,9 @@ function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, on
   const [room, setRoom] = useState<ReadingRoomResponse | null>(null);
   const [loading, setLoading] = useState(false), [loadingMore, setLoadingMore] = useState(false), [loadError, setLoadError] = useState('');
   const [refreshTick, setRefreshTick] = useState(0);
-  const [mode, setMode] = useState<'page' | 'percent'>(book.pages ? 'page' : 'percent');
-  const [marker, setMarker] = useState(String(book.pages ? Math.round(book.pages * progress / 100) : percentage(progress)));
-  const [manualProgress, setManualProgress] = useState(String(percentage(progress)));
+  const [mode, setMode] = useState<'page' | 'percent'>('page');
+  const [marker, setMarker] = useState(String(currentReadingPage(book) ?? ''));
+  const [totalPages, setTotalPages] = useState('');
   const [saving, setSaving] = useState(false);
   const markerEdited = useRef(false), modeRef = useRef(mode); modeRef.current = mode;
   const [body, setBody] = useState(''), [posting, setPosting] = useState(false), [postError, setPostError] = useState('');
@@ -86,22 +88,12 @@ function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, on
   useEffect(() => { active.current = true; return () => { active.current = false; serial.current++; request.current?.abort(); }; }, []);
   useEffect(() => {
     if (markerEdited.current) return;
-    setMarker(String(modeRef.current === 'page' && book.pages ? Math.round(book.pages * progress / 100) : modeRef.current === 'page' ? 0 : percentage(progress)));
-    setManualProgress(String(percentage(progress)));
-  }, [progress, book.pages]);
+    setMarker(String(modeRef.current === 'page' ? currentReadingPage(book) ?? '' : progress));
+  }, [progress, book.pages, book.currentPage]);
   useEffect(() => {
     if (pendingEntry && !book.readingLog?.some(entry => entry.id === pendingEntry)) { setPendingEntry(null); setProfileNeeded(false); }
   }, [book.readingLog, pendingEntry]);
 
-  const changeMode = (next: 'page' | 'percent') => {
-    if (next === mode) return;
-    const entered = Number(mode === 'page' && !book.pages ? manualProgress : marker);
-    const converted = mode === 'page' && book.pages ? entered / book.pages * 100 : entered;
-    const value = Number.isFinite(converted) && converted >= 0 && converted <= 100 ? converted : progress;
-    setManualProgress(String(percentage(value)));
-    setMarker(next === 'page' ? book.pages ? String(Math.round(book.pages * value / 100)) : '' : String(percentage(value)));
-    setMode(next);
-  };
 
   const refresh = useCallback(async (quiet = false) => {
     if (!accountId || !current.current.ready) return;
@@ -178,13 +170,11 @@ function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, on
     setPostError(''); setProfileNeeded(false); setSaving(!share); setPosting(share);
     try {
       const latest = current.current.book;
-      const entry = makeReadingEntry(latest, { body, mode, marker, progress: manualProgress }, { id: uid('log_'), createdAt: new Date().toISOString() });
+      const entry = makeReadingEntry(latest, { body, mode, marker, totalPages }, { id: uid('log_'), createdAt: new Date().toISOString() }, !markerEdited.current);
       // A thought at the existing bookmark must preserve its exact ceiling.
       // Display rounding and switching formats must not unlock more story.
-      entry.progress = !markerEdited.current ? bookProgress(latest)
-        : mode === 'page' ? latest.pages ? Number(marker) / latest.pages * 100 : Number(manualProgress)
-        : Number(marker);
-      update(library => appendReadingEntry(library, latest.id, entry));
+      const pages = mode === 'page' ? readingInputPages(latest, totalPages) : undefined;
+      update(library => appendReadingEntry(library, latest.id, entry, pages));
       setPendingEntry(share ? entry.id : null);
       setBody('');
       await flush();
@@ -227,12 +217,12 @@ function BookRoom({ book, state, update, accountId, ready, flush, onBookOpen, on
     <div className={styles.conversation}>
       <section className={styles.composer} aria-label="Your reading update">
         <div className={styles.composerTitle}><PenLine size={19}/><div><h2>Leave a little bookmark.</h2><p>A thought is optional. Your place in the book is enough.</p></div></div>
-        <div className={styles.composerMarker}>
-          <label className={styles.markerField}><span>{mode === 'page' ? 'Page reached' : 'Percentage read'}</span><input aria-label={mode === 'page' ? 'Reading together page reached' : 'Reading together percentage read'} type="number" inputMode={mode === 'page' ? 'numeric' : 'decimal'} min={0} max={mode === 'page' ? book.pages || 100000 : 100} step={mode === 'page' ? 1 : .1} value={marker} onChange={event => { markerEdited.current = true; setMarker(event.target.value); }} disabled={!ready || saving || posting}/></label>
-          <label className={styles.markerFormat}><span>Format</span><select value={mode} onChange={event => changeMode(event.target.value as 'page' | 'percent')} disabled={!ready || saving || posting}><option value="page">{book.pages ? `of ${book.pages.toLocaleString()} pages` : 'Page'}</option><option value="percent">% read</option></select></label>
-          {mode === 'page' && !book.pages ? <label className={styles.approximateMarker}><span>Approximately read</span><div><input type="number" aria-label="Approximate percentage at this page" min={0} max={100} step={.1} value={manualProgress} onChange={event => { markerEdited.current = true; setManualProgress(event.target.value); }} disabled={!ready || saving || posting}/><span>%</span></div></label> : null}
-        </div>
-        <p className={styles.markerHelp}>{mode === 'page' ? book.pages ? 'Using your edition’s page count. You can adjust it in Book details.' : 'Add an approximate percentage so the conversation can follow your place across editions.' : 'This marker stays with your update as you continue reading.'}</p>
+        <ReadingProgressInput book={book} value={{ mode, marker, totalPages }} unchangedBookmark={!markerEdited.current} labelPrefix="Reading together " disabled={!ready || saving || posting} onEditPageCount={() => onBookOpen(book.id)} onChange={(patch, field) => {
+          if (field !== 'mode') markerEdited.current = true;
+          if (patch.mode !== undefined) setMode(patch.mode);
+          if (patch.marker !== undefined) setMarker(patch.marker);
+          if (patch.totalPages !== undefined) setTotalPages(patch.totalPages);
+        }}/>
         <label className={styles.thoughtLabel}><span className={styles.optionalThought}>Your thought <small>optional</small></span><textarea value={body} onChange={event => setBody(event.target.value)} maxLength={READING_THOUGHT_LIMIT} rows={3} placeholder="A theory, a feeling, a line you’re still thinking about…" disabled={!ready || posting || saving}/></label>
         <div className={styles.composerActions}><span>{body.length.toLocaleString()} / 4,000</span><div><button type="button" className="button quiet" disabled={!ready || posting || saving} onClick={() => void saveThought(false)}>{saving ? <LoaderCircle className="spin" size={14}/> : <LockKeyhole size={14}/>}{body.trim() ? 'Keep privately' : 'Save my place'}</button>{accountId ? <button type="button" className="button primary" disabled={!ready || posting || saving} onClick={() => void saveThought(true)}>{posting ? <LoaderCircle className="spin" size={14}/> : <Send size={14}/>} {body.trim() ? 'Share thought' : 'Share progress'}</button> : <a className="button primary" href={signInPath('/')}><ArrowUpRight size={14}/>Sign in to share</a>}</div></div>
         <p className={styles.privacy}><Globe size={12}/>Sharing publishes this update, book, bookmark, and date on your profile. Your other notes stay private.</p>

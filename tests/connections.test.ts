@@ -111,6 +111,50 @@ test('turning progress sync off and on resumes only when its last imported bookm
   assert.equal(manual.status, 'reading'); assert.equal(manual.progress, 10);
 });
 
+test('a corrected edition page count keeps an exact local page and recalculates its percentage', () => {
+  const initial = syncConnection(emptyState(), connection(), [remote()], stamp).state;
+  Object.assign(initial.books[0], { status: 'reading', progress: 25, currentPage: 60 });
+  initial.books[0].readingLog = [{ id: 'page_note', body: 'A thought on this page', page: 60, progress: 25, createdAt: stamp }];
+  const result = syncConnection(initial, connection(), [remote({ pages: 300 })]).state.books[0];
+  assert.equal(result.currentPage, 60);
+  assert.equal(result.progress, 20);
+  assert.equal(result.status, 'reading');
+  assert.deepEqual(result.readingLog, initial.books[0].readingLog, 'Historical markers are not rewritten by a metadata correction');
+  assert.equal(initial.books[0].pages, 240, 'The source state is unchanged');
+});
+
+test('accepted provider progress clears an obsolete exact page while a local bookmark stays protected', () => {
+  const enabled = connection({ syncProgress: true });
+  const initial = syncConnection(emptyState(), enabled, [remote()], stamp).state;
+  initial.books[0].currentPage = 96;
+  const advanced = syncConnection(initial, enabled, [remote({ pages: 300, progress: 60 })]).state.books[0];
+  assert.equal(advanced.progress, 60); assert.equal(advanced.currentPage, undefined);
+  Object.assign(initial.books[0], { progress: 25, currentPage: 60 });
+  const protectedBook = syncConnection(initial, enabled, [remote({ progress: 90 })]).state.books[0];
+  assert.equal(protectedBook.progress, 25); assert.equal(protectedBook.currentPage, 60);
+});
+
+test('a changed provider edition clears its old spine and page without losing the reading history', () => {
+  const initial = syncConnection(emptyState(), connection(), [remote()], stamp).state;
+  Object.assign(initial.books[0], { catalogId: 'OL123W', editionId: 'OL456M', spineUrl: '/api/assets/old_spine', status: 'reading', progress: 25, currentPage: 60 });
+  initial.books[0].readingLog = [{ id: 'edition_note', body: 'An old edition thought', page: 60, progress: 25, createdAt: stamp }];
+  const result = syncConnection(initial, connection(), [remote({ isbn: '9780061120084', pages: 320 })]).state.books[0];
+  assert.equal(result.isbn, '9780061120084');
+  assert.equal(result.spineUrl, undefined); assert.equal(result.currentPage, undefined);
+  assert.equal(result.catalogId, undefined); assert.equal(result.editionId, undefined);
+  assert.equal(result.progress, 25); assert.equal(result.status, 'reading');
+  assert.deepEqual(result.readingLog, initial.books[0].readingLog);
+});
+
+test('equivalent ISBN10 and ISBN13 metadata retain the exact spine and numbered bookmark', () => {
+  const initial = syncConnection(emptyState(), connection(), [remote()], stamp).state;
+  Object.assign(initial.books[0], { catalogId: 'OL123W', editionId: 'OL456M', spineUrl: '/api/assets/exact_spine', status: 'reading', progress: 25, currentPage: 60 });
+  const result = syncConnection(initial, connection(), [remote({ isbn: '0140328726' })]).state.books[0];
+  assert.equal(result.isbn, '0140328726');
+  assert.equal(result.spineUrl, '/api/assets/exact_spine'); assert.equal(result.currentPage, 60);
+  assert.equal(result.editionId, 'OL456M'); assert.equal(result.progress, 25);
+});
+
 test('retries are idempotent and an absent remote book never deletes a local record or source', () => {
   const first = syncConnection(emptyState(), connection(), [remote(), remote()], stamp).state;
   const repeated = syncConnection(first, connection(), [remote()], stamp);

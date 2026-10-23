@@ -27,7 +27,7 @@ const book = z.object({
   id: idSchema, title: z.string().min(1).max(500), author: text(500), coverUrl: imageUrl,
   catalogId:catalogIdSchema.optional(),editionId:editionIdSchema.optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/), isbn: text(32).optional(), description: text(10000).optional(),
-  pages: z.number().int().min(0).max(100000).optional(), status: z.enum(['unread','reading','read','paused','dnf']),
+  pages: z.number().int().min(0).max(100000).optional(), currentPage: z.number().int().min(0).max(100000).optional(), status: z.enum(['unread','reading','read','paused','dnf']),
   format: z.enum(['paperback','hardcover','pocket','large']).optional(), spineUrl: imageUrl.optional(),
   dimensions: z.object({heightMm:z.number().min(100).max(500),widthMm:z.number().min(60).max(400),thicknessMm:z.number().min(2).max(150),source:z.enum(['estimated','catalog','manual'])}).optional(),
   readingLog:z.array(readingLogEntry).max(200).optional(),

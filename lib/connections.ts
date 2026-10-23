@@ -3,6 +3,8 @@ import { newBook, uid } from './types';
 import { bookColor } from './import';
 import { normalizeBookISBN } from './book-size';
 import { readingBookKey } from './reading';
+import { pageCountPatch } from './reading-progress';
+import { spineEditionChanged } from './spine-image';
 
 export interface RemoteBook {
   remoteId: string; title: string; author: string; coverUrl: string; url: string;
@@ -79,6 +81,12 @@ export function syncConnection(state: AppState, connection: LibraryConnection, i
     let book: Book = existing ? { ...existing } : { ...newBook(remote.title, remote.author), color: bookColor(remote.title + remote.author) };
     let changed = false, preserved = false;
     const accepted = importedBaseline(previous?.lastImported);
+    // Check provenance before a corrected page count recalculates the local
+    // fraction. An explicit provider bookmark remains an atomic pair.
+    const tracked = previous?.lastImported;
+    const untouchedBookmark = tracked && tracked.status !== undefined && tracked.progress !== undefined
+      ? book.status === tracked.status && book.progress === tracked.progress
+      : existing && book.status === 'unread' && book.progress === 0 && !book.readingLog?.length && !book.finishedAt && book.currentPage === undefined;
     for (const key of Object.keys(nextFields).filter(key => key !== 'status' && key !== 'progress') as (keyof ImportedBookFields)[]) {
       const value = nextFields[key], local = book[key], base = previous?.lastImported[key];
       // At first connection, only fill missing fields on an existing record.
@@ -87,22 +95,32 @@ export function syncConnection(state: AppState, connection: LibraryConnection, i
       const missing = !hasValue(local) && (!previous || base === undefined);
       const mayUpdate = !existing || missing || previous && base !== undefined && local === base;
       if (mayUpdate) {
-        if (local !== value) { Object.assign(book, { [key]: value }); changed = true; }
+        if (local !== value) {
+          Object.assign(book, key === 'pages' ? pageCountPatch(book, value as number) : { [key]: value });
+          changed = true;
+        }
         Object.assign(accepted, { [key]: value });
       } else if (local === value) {
         Object.assign(accepted, { [key]: value });
       } else if (value !== base) preserved = true;
     }
+    if (existing && spineEditionChanged(existing, book)) {
+      // An image and a numbered page describe one physical edition. Retain
+      // reading history, but never carry that artwork/bookmark to a new ISBN.
+      book.spineUrl = undefined; book.currentPage = undefined;
+      book.catalogId = undefined; book.editionId = undefined;
+      book.progress = existing.progress; book.status = existing.status; book.finishedAt = existing.finishedAt;
+      if (book.dimensions?.source !== 'manual') book.dimensions = undefined;
+    }
     if (connection.syncProgress && nextFields.status !== undefined && nextFields.progress !== undefined) {
-      const tracked = previous?.lastImported;
-      const untouched = tracked && tracked.status !== undefined && tracked.progress !== undefined
-        ? book.status === tracked.status && book.progress === tracked.progress
-        : existing && book.status === 'unread' && book.progress === 0 && !book.readingLog?.length && !book.finishedAt;
       const nextStatus = nextFields.status, nextProgress = nextFields.progress;
       // Status and progress form one bookmark. Updating them separately could
       // mark a locally edited reread finished and unexpectedly expose spoilers.
-      if (!existing || untouched) {
-        if (book.status !== nextStatus || book.progress !== nextProgress) changed = true;
+      if (!existing || untouchedBookmark) {
+        if (book.status !== nextStatus || book.progress !== nextProgress) {
+          changed = true;
+          book.currentPage = undefined;
+        }
         book.status = nextStatus; book.progress = nextProgress;
         accepted.status = nextStatus; accepted.progress = nextProgress;
       } else if (book.status === nextStatus && book.progress === nextProgress) {
@@ -113,6 +131,11 @@ export function syncConnection(state: AppState, connection: LibraryConnection, i
     // so could turn a provider reread into "reading, 100%" and expose its ending.
     // Retain the last accepted pair while sync is off. Opting back in can then
     // resume an unchanged bookmark while still detecting edits made meanwhile.
+    // Optional fields cleared by reconciliation must also round-trip through
+    // JSON backups, which omit undefined object properties.
+    for (const key of ['currentPage', 'spineUrl', 'catalogId', 'editionId', 'dimensions', 'finishedAt'] as const) {
+      if (book[key] === undefined) delete book[key];
+    }
     const sourceId = previous?.sourceId ?? uid('src_');
     const label = remote.owned ? 'Hardcover · marked owned' : 'Hardcover';
     const source = { id: sourceId, kind: 'link' as const, label, url: remote.url };

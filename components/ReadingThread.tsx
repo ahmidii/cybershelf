@@ -5,9 +5,12 @@ import { ArrowLeft, ArrowUpRight, BookOpen, LoaderCircle, MessageCircle, Send, S
 import type { Book, ReadingComment, ReadingPost, StateResponse } from '@/lib/types';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { progressLabel, readerPosition, readingDate } from '@/lib/reading';
+import { displayReadingProgress, resolveReadingPosition, type ReadingPositionInput } from '@/lib/reading-progress';
+import { pageFirstViewInput, viewReadingBook } from '@/lib/reading-view';
 import BookCover from './BookCover';
 import BrandWordmark from './BrandWordmark';
 import SpoilerText from './SpoilerText';
+import ReadingProgressInput from './ReadingProgressInput';
 import styles from './ReadingConversation.module.css';
 
 interface Thread { post: ReadingPost; comments: ReadingComment[]; viewer: { accountId: string | null; canModerate: boolean }; }
@@ -23,8 +26,13 @@ export default function ReadingThread({ id }: { id: string }) {
   const [thread, setThread] = useState<Thread | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState('');
-  const [body, setBody] = useState(''), [replyProgress, setReplyProgress] = useState('');
+  const [body, setBody] = useState('');
+  const [replyAt, setReplyAt] = useState<'thought' | 'bookmark' | 'later'>('thought');
+  const [replyDraft, setReplyDraft] = useState<ReadingPositionInput>({ mode: 'page', marker: '' });
   const [position, setPosition] = useState<number | null>(null), [protect, setProtect] = useState(true);
+  const [positionDraft, setPositionDraft] = useState<ReadingPositionInput>({ mode: 'page', marker: '' });
+  const [positionEdited, setPositionEdited] = useState(false), [positionError, setPositionError] = useState('');
+  const [localPages, setLocalPages] = useState<number | undefined>();
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null), [retry, setRetry] = useState(0);
   const [checkingViewer, setCheckingViewer] = useState(true);
@@ -47,8 +55,9 @@ export default function ReadingThread({ id }: { id: string }) {
         if (changed) {
           viewerEpoch.current++; setBody(''); setPosition(null); setProtect(true);
           setError(''); setNotice(''); setDeleting(null); setBusy(false);
+          setReplyAt('thought'); setReplyDraft({ mode: 'page', marker: '' });
+          setPositionDraft({ mode: 'page', marker: '' }); setPositionEdited(false); setPositionError(''); setLocalPages(undefined);
         }
-        if (changed || viewer.current === undefined) setReplyProgress(String(result.post.entry.progress));
         viewer.current = result.viewer.accountId;
         setThread(result); setLoadError(''); setLoading(false);
         if (result.viewer.accountId) {
@@ -77,6 +86,14 @@ export default function ReadingThread({ id }: { id: string }) {
   }, [id, retry]);
 
   useEffect(() => {
+    viewerEpoch.current++;
+    setBody(''); setPosition(null); setProtect(true); setReplyAt('thought');
+    setReplyDraft({ mode: 'page', marker: '' }); setPositionDraft({ mode: 'page', marker: '' });
+    setPositionEdited(false); setPositionError(''); setLocalPages(undefined);
+    setError(''); setNotice(''); setDeleting(null); setBusy(false);
+  }, [id]);
+
+  useEffect(() => {
     if (!thread || checkingViewer) return;
     const visitReply = () => {
       try {
@@ -94,15 +111,45 @@ export default function ReadingThread({ id }: { id: string }) {
   const readerProgress = position ?? known.progress;
   const unread = position === null ? known.unread : position === 0;
   const returnPath = '/j/' + encodeURIComponent(id);
+  const inputBook = thread ? viewReadingBook(thread.post.book, books, readerProgress, localPages) : { pages: undefined, progress: 0, status: 'unread' as const };
+  const canEditLocalPages = !!localPages && !!thread && !viewReadingBook(thread.post.book, books, readerProgress).pages;
+
+  useEffect(() => {
+    if (checkingViewer || !thread || positionEdited) return;
+    setPositionDraft(current => current.mode === 'percent' ? { mode: 'percent', marker: String(readerProgress) } : pageFirstViewInput(inputBook));
+  }, [checkingViewer, thread?.post.id, inputBook.pages, readerProgress, positionEdited]);
+
+  const applyPosition = () => {
+    if (checkingViewer || !positionEdited) return;
+    try {
+      const resolved = resolveReadingPosition(inputBook, positionDraft);
+      setPosition(resolved.progress);
+      if (resolved.pages) setLocalPages(resolved.pages);
+      setPositionEdited(false); setPositionError('');
+    } catch (reason) { setPositionError(reason instanceof Error ? reason.message : 'Choose a valid reading place.'); }
+  };
+  const editLocalPageCount = () => {
+    const totalPages = String(localPages ?? '');
+    setPositionDraft(current => ({ ...current, totalPages }));
+    setReplyDraft(current => ({ ...current, totalPages }));
+    setPositionEdited(true); setLocalPages(undefined); setPositionError('');
+  };
 
   async function reply(event: React.FormEvent) {
     event.preventDefault();
     if (!thread?.viewer.accountId || busy || checkingViewer) return;
     const accountId = thread.viewer.accountId, epoch = viewerEpoch.current;
     const current = () => viewer.current === accountId && viewerEpoch.current === epoch;
-    const progress = Number(replyProgress);
-    if (!replyProgress.trim() || !Number.isFinite(progress) || progress < thread.post.entry.progress || progress > 100) {
-      setError(`Choose a reply marker from ${thread.post.entry.progress}% to 100%.`); return;
+    let progress = replyAt === 'thought' ? thread.post.entry.progress : readerProgress;
+    if (replyAt === 'later') {
+      try {
+        const resolved = resolveReadingPosition(inputBook, replyDraft);
+        progress = resolved.progress;
+        if (resolved.pages) setLocalPages(resolved.pages);
+      } catch (reason) { setError(reason instanceof Error ? reason.message : 'Choose the page your reply reaches.'); return; }
+    }
+    if (!Number.isFinite(progress) || progress < thread.post.entry.progress || progress > 100) {
+      setError('Your reply’s marker must be at or after this thought. Choose a later page or use “This thought”.'); return;
     }
     setBusy(true); setError(''); setNotice('');
     try {
@@ -145,13 +192,22 @@ export default function ReadingThread({ id }: { id: string }) {
         <a className={styles.backLink} href={'/u/' + encodeURIComponent(thread.post.profileId)}><ArrowLeft size={14}/> {thread.post.name}’s reading life</a>
         <section className={styles.bookHeading}><BookCover book={thread.post.book}/><div><p className={styles.eyebrow}>A reading conversation</p><h1>{thread.post.book.title}</h1><p>{thread.post.book.author}</p><span className={styles.marker}>{progressLabel(thread.post.entry.progress, thread.post.entry.page)}</span></div></section>
         <section className={styles.guard} aria-label="Spoiler preferences">
-          <div className={styles.guardTitle}><ShieldCheck size={18}/><div><strong>Read at your own pace</strong><p>Thoughts beyond your place stay hidden. Progress is compared by percentage because editions can have different pages.</p></div></div>
-          <div className={styles.guardControls}><label>Your place <span><input type="number" min="0" max="100" step="0.1" value={checkingViewer ? '' : readerProgress} disabled={checkingViewer} onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value)) setPosition(Math.min(100, Math.max(0, value))); }}/> %</span></label><label className={styles.check}><input type="checkbox" checked={checkingViewer || protect} disabled={checkingViewer} onChange={event => setProtect(event.target.checked)}/>Hide thoughts ahead of me</label>{position !== null && !checkingViewer && <button className="text-button" onClick={() => setPosition(null)}>Use my saved progress</button>}</div>
-          <p className={styles.help}>{checkingViewer ? 'Checking your account and reading progress…' : position !== null ? 'This changes the view here; your saved reading progress stays as it is.' : known.unread ? 'No reading progress found for this book. Choose your place above, or reveal an individual thought.' : `Using ${known.progress}% from your library.`} Markers depend on what readers choose to share.</p>
+          <div className={styles.guardTitle}><ShieldCheck size={18}/><div><strong>Read at your own pace</strong><p>Enter the page in your own edition. We’ll calculate your place across editions and keep later thoughts hidden.</p></div></div>
+          <div className={styles.viewPosition}>
+            <ReadingProgressInput book={inputBook} value={positionDraft} disabled={checkingViewer} unchangedBookmark={!positionEdited} labelPrefix="Your place: " onEditPageCount={canEditLocalPages ? editLocalPageCount : undefined}
+              onChange={(patch, field) => { setPositionDraft(current => ({ ...current, ...patch })); if (field !== 'mode') setPositionEdited(true); setPositionError(''); }}/>
+            <div className={styles.positionActions}><button type="button" className="button secondary small" disabled={checkingViewer || !positionEdited} onClick={applyPosition}>Use this place</button>
+              {position !== null && !checkingViewer && <button type="button" className="text-button" onClick={() => { setPosition(null); setPositionEdited(false); setPositionError(''); }}>Use my saved progress</button>}
+              {!checkingViewer && <span>Showing up to {displayReadingProgress(readerProgress)}%</span>}
+            </div>
+            {positionError && <p className="notice error" role="alert">{positionError}</p>}
+          </div>
+          <div className={styles.guardControls}><label className={styles.check}><input type="checkbox" checked={checkingViewer || protect} disabled={checkingViewer} onChange={event => setProtect(event.target.checked)}/>Hide thoughts ahead of me</label></div>
+          <p className={styles.help}>{checkingViewer ? 'Checking your account and reading progress…' : position !== null ? 'This changes the view here; your saved reading progress stays as it is.' : known.unread ? 'No reading progress found for this book. Choose your place above, or reveal an individual thought.' : `Using ${displayReadingProgress(known.progress)}% from your library.`} Page totals entered here stay on this page; your library is unchanged. Markers depend on what readers choose to share.</p>
         </section>
         <article className={styles.thought}>
           <header className={styles.entryHeader}><a href={'/u/' + encodeURIComponent(thread.post.profileId)}>{thread.post.name}</a><time dateTime={thread.post.entry.createdAt}>{readingDate(thread.post.entry.createdAt)}</time></header>
-          {thread.post.entry.body ? <><div hidden={checkingViewer}><SpoilerText key={thread.viewer.accountId ?? 'guest'} body={thread.post.entry.body} progress={thread.post.entry.progress} readerProgress={readerProgress} unread={unread} defaultHide={protect}/></div>{checkingViewer && <p className={styles.help} role="status">Checking your reading place…</p>}</> : <p className={styles.milestone}>{thread.post.entry.progress === 100 ? 'Finished this book.' : thread.post.entry.progress === 0 ? 'Started a new reading journey.' : `Reached ${thread.post.entry.progress}% of this book.`}</p>}
+          {thread.post.entry.body ? <><div hidden={checkingViewer}><SpoilerText key={thread.viewer.accountId ?? 'guest'} body={thread.post.entry.body} progress={thread.post.entry.progress} readerProgress={readerProgress} unread={unread} defaultHide={protect}/></div>{checkingViewer && <p className={styles.help} role="status">Checking your reading place…</p>}</> : <p className={styles.milestone}>{thread.post.entry.progress === 100 ? 'Finished this book.' : thread.post.entry.progress === 0 ? 'Started a new reading journey.' : `Reached ${displayReadingProgress(thread.post.entry.progress)}% of this book.`}</p>}
           <footer className={styles.entryFooter}><span><BookOpen size={14}/>{progressLabel(thread.post.entry.progress, thread.post.entry.page)}</span><span><MessageCircle size={14}/>{thread.comments.length} {thread.comments.length === 1 ? 'reply' : 'replies'}</span></footer>
         </article>
         <section className={styles.replies} aria-label="Replies">
@@ -167,9 +223,14 @@ export default function ReadingThread({ id }: { id: string }) {
         {notice && <p className={styles.notice} role="status">{notice}</p>}
         {checkingViewer && <p className={styles.help} role="status">Checking your account before replying…</p>}
         {thread.viewer.accountId ? <form hidden={checkingViewer} className={styles.replyForm} onSubmit={event => void reply(event)}>
-          <h2>Meet them where they are</h2><p>Keep your reply within the entry’s {thread.post.entry.progress}% marker. If you discuss something later, raise your reply’s marker so it stays hidden from readers who haven’t reached it.</p>
+          <h2>Meet them where they are</h2><p>Your reply starts at this thought’s {displayReadingProgress(thread.post.entry.progress)}% marker. If you discuss something later, choose your bookmark or the page it reaches so it stays hidden until readers catch up.</p>
           <label className="field">Your reply<textarea value={body} onChange={event => setBody(event.target.value)} maxLength={4000} rows={5} placeholder="What stayed with you at this point?" required disabled={busy}/></label>
-          <div className={styles.composerFooter}><label>Discusses events up to <span><input type="number" min={thread.post.entry.progress} max="100" step="0.1" value={replyProgress} onChange={event => setReplyProgress(event.target.value)} required disabled={busy}/> %</span></label><button type="submit" className="button primary" disabled={busy || !body.trim() || thread.comments.length >= 100}>{busy ? <LoaderCircle size={15} className="spin"/> : <Send size={15}/>}Share reply</button></div>
+          {replyAt === 'later' && <div className={styles.replyPosition}><ReadingProgressInput book={inputBook} value={replyDraft} disabled={busy} labelPrefix="Reply marker: " onEditPageCount={canEditLocalPages ? editLocalPageCount : undefined} onChange={patch => { setReplyDraft(current => ({ ...current, ...patch })); setError(''); }}/></div>}
+          <div className={styles.composerFooter}><label>Discusses events up to <select value={replyAt} disabled={busy} onChange={event => { setReplyAt(event.target.value as 'thought' | 'bookmark' | 'later'); setError(''); }}>
+            <option value="thought">This thought · {displayReadingProgress(thread.post.entry.progress)}%</option>
+            <option value="bookmark" disabled={readerProgress < thread.post.entry.progress}>My bookmark · {displayReadingProgress(readerProgress)}%</option>
+            <option value="later">A later point…</option>
+          </select></label><button type="submit" className="button primary" disabled={busy || !body.trim() || thread.comments.length >= 100}>{busy ? <LoaderCircle size={15} className="spin"/> : <Send size={15}/>}Share reply</button></div>
           <p className={styles.help}>Your display name and reply will be public while this entry is shared.{thread.comments.length >= 100 ? ' This conversation has reached its limit of 100 replies.' : ''}</p>
         </form> : <div hidden={checkingViewer} className={styles.signinPrompt}><h2>A story is better with company.</h2><p>Sign in to reply at this point in the book.</p><a className="button primary" href={signInPath(returnPath)}>Join the conversation <ArrowUpRight size={15}/></a></div>}
       </> : null}

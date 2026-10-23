@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.7.0 — Pages, touch, and real spines — 2026-10-23
+
+### Added
+
+- Page-first reading updates in Book details, Reading together, and journal composition. Percentages calculate automatically; an unknown edition total is requested once and saved with the copy. Percentage entry remains an explicit alternative.
+- Exact saved page bookmarks, conservative legacy-page inference, and separate display rounding. JSON and CSV backups preserve the current page without changing the library schema version.
+- Larger touch placement controls, direct drag-and-release in Arrange shelf, one-handed pick-up/tap/place, and position arrows. Browsing swipes scroll naturally; drag previews retain the chosen pose and support. The desktop mouse-wheel and keyboard interactions are retained.
+- A visible spine-artwork panel with real-image previews, camera/photo selection, and a browser crop editor with drag, zoom, width, rotation, and keyboard controls. Only the cropped JPEG is uploaded through the existing private asset service.
+- Page-based local spoiler-view controls on public journals and conversations, using the viewer's own edition rather than the author's page count. Replies default to the thought's exact marker.
+
+### Fixed
+
+- Rounded percentage labels revealing a later thought or implying completion before the last page. Spoiler comparisons retain full precision.
+- Page-count corrections losing an exact bookmark, and metadata refreshes applying a previous edition's page or spine to a different edition. Equivalent ISBN forms preserve the copy's artwork.
+- Touch placement controls covering lower shelves, accidental drops when a finger reaches the toolbar, and pose changes being lost during a drag.
+- Generated spine decorations showing beneath authentic artwork. Real images are used for upright, leaning, and stacked books; failed images fall back to typography.
+
+### Boundaries
+
+- Automatic edition-specific spine retrieval is not included: the current catalog APIs provide covers without a reliable spine-image field. Real artwork comes from the reader's photo or image link; typography is labelled as a fallback.
+- Page fractions are approximate across different editions. Readers still choose the marker for their thoughts, and historical markers are not rewritten by page-count corrections.
+- No dependencies, database migrations, account configuration, or Cloudflare resources are added. Physical iPhone/iPad gesture testing remains separate from automated verification.
+
 ## 0.6.0 — Your account, everywhere — 2026-10-22
 
 ### Added

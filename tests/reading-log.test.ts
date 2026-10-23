@@ -10,19 +10,43 @@ const emptyState = (): AppState => ({ schemaVersion: 1, profile: { name: 'Reader
 test('page and percentage markers capture progress independently of future book changes', () => {
   const book = { pages: 320, progress: 20 };
   const entry = makeReadingEntry(book, { mode: 'page', marker: '100', body: '  A thought, at this moment.  ' }, identity);
-  assert.deepEqual(entry, { ...identity, page: 100, progress: 31.3, body: 'A thought, at this moment.' });
+  assert.deepEqual(entry, { ...identity, page: 100, progress: 31.25, body: 'A thought, at this moment.' });
   book.progress = 92;
-  assert.equal(entry.progress, 31.3);
+  assert.equal(entry.progress, 31.25);
   assert.equal(readingMarker(entry), 'Page 100 · 31.3%');
-  assert.equal(makeReadingEntry(book, { mode: 'percent', marker: '42.25', body: '' }, identity).progress, 42.3);
+  assert.equal(makeReadingEntry(book, { mode: 'percent', marker: '42.25', body: '' }, identity).progress, 42.25);
 });
 
-test('unknown page counts keep an explicit approximate percentage and allow progress-only entries', () => {
-  const entry = makeReadingEntry({ progress: 10 }, { mode: 'page', marker: '53', progress: '25', body: '' }, identity);
-  assert.deepEqual(entry, { ...identity, page: 53, progress: 25, body: '' });
-  assert.equal(makeReadingEntry({ pages: 0, progress: 18 }, { mode: 'page', marker: '29', body: '' }, identity).progress, 18);
+test('unknown page counts ask for total pages once and never require a guessed percentage', () => {
+  const entry = makeReadingEntry({ progress: 10 }, { mode: 'page', marker: '53', totalPages: '320', body: '' }, identity);
+  assert.deepEqual(entry, { ...identity, page: 53, progress: 53 / 320 * 100, body: '' });
+  assert.throws(() => makeReadingEntry({ pages: 0, progress: 18 }, { mode: 'page', marker: '29', body: '' }, identity), /total pages once/);
+  assert.throws(() => makeReadingEntry({ progress: 100 }, { mode: 'page', marker: '29', body: '' }, identity), /total pages once/);
   assert.equal(readingMarker({ progress: 25 }), '25% read');
-  for (const progress of ['', '-1', '101', 'not a percentage']) assert.throws(() => makeReadingEntry({ progress: 20 }, { mode: 'page', marker: '40', progress, body: '' }, identity), /percentage/);
+  for (const totalPages of ['0', '-1', '100001', '20.5', 'not a page count']) assert.throws(() => makeReadingEntry({ progress: 20 }, { mode: 'page', marker: '40', totalPages, body: '' }, identity), /Total pages/);
+});
+
+test('page-based updates retain precise bookmarks and do not round the penultimate page to finished', () => {
+  const state = emptyState();
+  const book = state.books[0];
+  const entry = makeReadingEntry(book, { mode: 'page', marker: '99999', totalPages: '100000', body: '' }, identity);
+  const next = appendReadingEntry(state, book.id, entry, 100000);
+  assert.ok(entry.progress < 100);
+  assert.equal(next.books[0].pages, 100000);
+  assert.equal(next.books[0].currentPage, 99999);
+  assert.equal(next.books[0].status, 'reading');
+  assert.equal(next.books[0].finishedAt, undefined);
+  assert.equal(readingMarker(entry), 'Page 99,999 · 99.9%');
+});
+
+test('a thought at an unchanged legacy bookmark cannot advance its spoiler ceiling', () => {
+  const state = emptyState();
+  const book = state.books[0]; book.pages = 300; book.progress = 40.3; book.status = 'reading';
+  const entry = makeReadingEntry(book, { mode: 'page', marker: '120', body: 'A thought at my saved place' }, identity, true);
+  const next = appendReadingEntry(state, book.id, entry, 300);
+  assert.equal(entry.progress, 40.3);
+  assert.equal(next.books[0].progress, 40.3);
+  assert.equal(next.books[0].currentPage, undefined, 'An inferred page is not stored as an exact bookmark');
 });
 
 test('reading markers and thought length reject invalid input before saving', () => {

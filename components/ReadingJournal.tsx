@@ -7,6 +7,8 @@ import { uid } from '@/lib/types';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { appendReadingEntry, makeReadingEntry, readingMarker, READING_LOG_LIMIT, READING_THOUGHT_LIMIT } from '@/lib/reading-log';
 import BookCover from './BookCover';
+import ReadingProgressInput from './ReadingProgressInput';
+import { currentReadingPage, readingInputPages, type ReadingPositionInput } from '@/lib/reading-progress';
 import styles from './ReadingJournal.module.css';
 
 interface Props {
@@ -26,13 +28,12 @@ interface Props {
 }
 interface SharedEntry { id: string; bookId: string; entryId: string; published: boolean; publishedAt: string; }
 interface SharingState { posts: SharedEntry[]; profileId?: string; }
-interface Draft { body: string; mode: 'page' | 'percent'; marker: string; progress?: string; }
+interface Draft extends ReadingPositionInput { body: string; markerEdited?: boolean; }
 
 function startingDraft(book: Book): Draft {
-  return book.pages && book.pages > 0
-    ? { body: '', mode: 'page', marker: String(Math.round(book.pages * book.progress / 100)) }
-    : { body: '', mode: 'percent', marker: String(book.progress), progress: String(book.progress) };
+  return { body: '', mode: 'page', marker: String(currentReadingPage(book) ?? ''), totalPages: '' };
 }
+
 async function jsonRequest<T>(url: string, accountId: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(url, {
     cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(15000), ...options,
@@ -83,12 +84,7 @@ export default function ReadingJournal({ state, update, accountId, ready, flush,
     if (!selected || !draft) return;
     setDrafts(previous => ({ ...previous, [selected.id]: { ...draft, ...patch } }));
   };
-  const changeMode = (mode: Draft['mode']) => {
-    if (!selected || !draft || mode === draft.mode) return;
-    const number = Number(draft.marker);
-    const progress = draft.mode === 'page' && selected.pages ? number / selected.pages * 100 : draft.mode === 'percent' ? number : Number(draft.progress ?? selected.progress);
-    setDraft({ mode, progress: String(Number.isFinite(progress) ? progress : selected.progress), marker: String(mode === 'percent' ? Math.round(Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : selected.progress)) * 10) / 10 : selected.pages ? Math.round(selected.pages * progress / 100) : 0) });
-  };
+
   const refreshSharing = async () => {
     if (!accountId) return { posts: [] } as SharingState;
     const result = await jsonRequest<SharingState>('/api/journal', accountId);
@@ -116,11 +112,13 @@ export default function ReadingJournal({ state, update, accountId, ready, flush,
     try {
       const book = current.current.books.find(book => book.id === selected.id);
       if (!book) throw new Error('Choose a book from your library.');
-      const entry = makeReadingEntry(book, draft, { id: uid('log_'), createdAt: new Date().toISOString() });
+      // Writing a thought or switching display units never advances the saved bookmark.
+      const entry = makeReadingEntry(book, draft, { id: uid('log_'), createdAt: new Date().toISOString() }, !draft.markerEdited);
+      const pages = draft.mode === 'page' ? readingInputPages(book, draft.totalPages) : undefined;
       if ((book.readingLog?.length ?? 0) >= READING_LOG_LIMIT) throw new Error('This book has 200 updates. Export a backup, then remove an older update to make room.');
       setBusy('composer');
-      update(state => appendReadingEntry(state, book.id, entry));
-      setDrafts(previous => ({ ...previous, [book.id]: { ...draft, body: '' } }));
+      update(state => appendReadingEntry(state, book.id, entry, pages));
+      setDrafts(previous => ({ ...previous, [book.id]: { ...draft, body: '', markerEdited: false } }));
       if (share) await publishSavedEntry(book.id, entry.id);
       else { await flush(); if (isCurrent()) notify(accountId ? 'Reading update saved privately.' : 'Reading update added to your private browser draft.'); }
     } catch (error) { if (isCurrent()) setError(error instanceof Error ? error.message : 'Your update could not be saved.'); }
@@ -180,9 +178,7 @@ export default function ReadingJournal({ state, update, accountId, ready, flush,
       <div className={styles.composerHeading}><PenLine size={20}/><div><h2>Leave a little bookmark.</h2><p>A thought is optional. Your place in the book is enough.</p></div></div>
       <div className={styles.bookChooser}><button type="button" className={styles.coverButton} onClick={() => onBookOpen(selected.id)} aria-label={`Open ${selected.title}`}><BookCover book={selected} small/></button><label className="field">What are you reading?<select value={selected.id} disabled={!ready || !!busy} onChange={event => { setBookId(event.target.value); setError(''); }}>{state.books.map(book => <option key={book.id} value={book.id}>{book.title} — {book.author}</option>)}</select></label></div>
       {onReadTogether && <button type="button" className={styles.togetherLink} onClick={() => onReadTogether(selected.id)}><UsersRound size={15}/><span>Read this book with your circle</span><ArrowUpRight size={13}/></button>}
-      <div className={styles.markerRow}><div className={styles.modeSwitch} role="group" aria-label="Reading progress format"><button type="button" aria-pressed={draft.mode === 'page'} onClick={() => changeMode('page')} disabled={!!busy}>Page</button><button type="button" aria-pressed={draft.mode === 'percent'} onClick={() => changeMode('percent')} disabled={!!busy}>Percentage</button></div><label className={styles.markerInput}><span>{draft.mode === 'page' ? 'Page reached' : 'Percentage read'}</span><input aria-label={draft.mode === 'page' ? 'Page reached' : 'Percentage read'} type="number" inputMode="decimal" min="0" max={draft.mode === 'percent' ? 100 : selected.pages || 100000} step={draft.mode === 'page' ? 1 : .1} value={draft.marker} disabled={!!busy} onChange={event => setDraft({ marker: event.target.value })}/><span>{draft.mode === 'page' ? selected.pages ? `of ${selected.pages.toLocaleString()}` : 'pages' : '%'}</span></label></div>
-      {draft.mode === 'page' && !selected.pages && <label className={styles.unknownProgress}>Progress at this page<input aria-label="Progress percentage at this page" type="number" min="0" max="100" step="0.1" value={draft.progress ?? String(selected.progress)} onChange={event => setDraft({ progress: event.target.value })} disabled={!!busy}/><span>%</span></label>}
-      <p className={styles.progressHint}>{draft.mode === 'page' ? selected.pages ? `Calculated using the ${selected.pages.toLocaleString()} pages saved for this book. Adjust the page count in Book details if your copy differs.` : 'This edition’s page count is unknown. Set an approximate percentage as well, so readers know how far the thought reaches.' : 'This percentage stays with the entry, even as you read further.'}</p>
+      <ReadingProgressInput book={selected} value={draft} unchangedBookmark={!draft.markerEdited} disabled={!ready || !!busy} onEditPageCount={() => onBookOpen(selected.id)} onChange={(patch, field) => setDraft({ ...patch, ...(field === 'mode' ? {} : { markerEdited: true }) })}/>
       <label className={styles.thoughtLabel}>A thought to keep <span>optional</span><textarea rows={4} maxLength={READING_THOUGHT_LIMIT} value={draft.body} disabled={!!busy} onChange={event => setDraft({ body: event.target.value })} placeholder="A sentence that stayed with you, a theory, a change of heart…"/></label>
       <div className={styles.composerFooter}><span>{draft.body.length.toLocaleString()} / 4,000</span><div><button type="button" className="button secondary" disabled={!ready || !!busy} onClick={() => void save(false)}>{busy === 'composer' ? <LoaderCircle size={15} className="spin"/> : <LockKeyhole size={15}/>}Save privately</button><button type="button" className="button primary" disabled={!ready || !!busy} onClick={() => void save(true)}><Globe size={15}/>Share update</button></div></div>
       <p className={styles.privacy}><LockKeyhole size={13}/>Only entries you share become public. Sharing includes this thought, its book, progress, and date, and opens it for comments. Your other notes and reviews stay private.</p>

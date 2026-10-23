@@ -28,7 +28,7 @@ export interface LibraryConnection {
 export interface Book {
   id: string; title: string; author: string; coverUrl: string; color: string;
   catalogId?: string; editionId?: string;
-  isbn?: string; description?: string; pages?: number;
+  isbn?: string; description?: string; pages?: number; currentPage?: number;
   format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string;
   readingLog?: ReadingLogEntry[];
   status: ReadingStatus; progress: number; rating: number | null;

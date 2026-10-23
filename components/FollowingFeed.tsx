@@ -4,6 +4,7 @@ import { ArrowUpRight, BookOpen, ChevronDown, Globe, LoaderCircle, MessageCircle
 import type { ActivityEvent, AppState, Book } from '@/lib/types';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { readerPosition, readingBookKey } from '@/lib/reading';
+import { displayReadingProgress } from '@/lib/reading-progress';
 import BookCover from './BookCover';
 import ShelfCanvas from './ShelfCanvas';
 import SpoilerText from './SpoilerText';
@@ -155,8 +156,8 @@ export default function FollowingFeed({ state, accountId, ready, flush, onOpenPr
         const guarded = hideUnread && position.unread || hideAhead && (item.progress ?? 0) > position.progress;
         return <article className={styles.card} key={item.kind + ':' + item.id}>
           <div className={styles.byline}><a className={styles.avatar} href={'/u/' + item.actor.id} aria-label={'Visit ' + item.actor.name + '’s profile'}>{item.actor.name.slice(0, 1).toUpperCase()}</a><div><a href={'/u/' + item.actor.id}>{item.actor.name}</a><span>{eventLabel(item)}</span></div><time dateTime={item.createdAt} title={new Date(item.createdAt).toLocaleString()}>{displayDate(item.createdAt)}</time></div>
-          {item.book ? <div className={styles.bookHeading}><BookCover book={item.book} small /><div><h2>{item.book.title}</h2><p>{item.book.author}</p></div>{item.progress !== undefined ? <span className={styles.progress}>{Math.round(item.progress)}% through</span> : null}</div> : null}
-          {item.body ? <SpoilerText body={item.body} progress={item.progress ?? 0} readerProgress={position.progress} unread={position.unread} defaultHide={guarded} /> : item.kind === 'reading' ? <p className={styles.progressOnly}>A new bookmark at {Math.round(item.progress ?? 0)}%.</p> : null}
+          {item.book ? <div className={styles.bookHeading}><BookCover book={item.book} small /><div><h2>{item.book.title}</h2><p>{item.book.author}</p></div>{item.progress !== undefined ? <span className={styles.progress}>{displayReadingProgress(item.progress)}% through</span> : null}</div> : null}
+          {item.body ? <SpoilerText body={item.body} progress={item.progress ?? 0} readerProgress={position.progress} unread={position.unread} defaultHide={guarded} /> : item.kind === 'reading' ? <p className={styles.progressOnly}>A new bookmark at {displayReadingProgress(item.progress ?? 0)}%.</p> : null}
           {item.shelf ? <a className={styles.shelfPreview} href={'/s/' + item.shelf.id}><div><ShelfCanvas shelf={item.shelf.shelf} books={item.shelf.books} compact /></div><h2>{item.shelf.shelf.title}</h2><p>{item.shelf.bookCount} books<ArrowUpRight size={15} /></p></a> : null}
           {item.postId || conversationBook && onReadTogether ? <footer className={styles.cardFooter}>{conversationBook && onReadTogether ? <button type="button" className={styles.readTogether} onClick={() => onReadTogether(conversationBook.id)}><Users size={14}/>Read together at my bookmark<ArrowUpRight size={13}/></button> : null}{item.postId ? <a href={'/j/' + item.postId + (item.commentId ? '#comment-' + item.commentId : '')}><MessageCircle size={14}/>{conversationBook && onReadTogether ? 'Open shared entry' : 'Open conversation'}<ArrowUpRight size={13}/></a> : null}</footer> : null}
         </article>;

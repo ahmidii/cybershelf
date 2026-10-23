@@ -7,12 +7,17 @@ import ts from 'typescript';
 
 // Render the actual component. Only the CSS-module import is stubbed for Node;
 // hooks, JSX, icons, conditional mounting, and generated markup stay real.
+const progressCode = ts.transpileModule(readFileSync(new URL('../lib/reading-progress.ts', import.meta.url), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const progressModule = 'data:text/javascript;base64,' + Buffer.from(progressCode).toString('base64');
 const source = readFileSync(new URL('../components/SpoilerText.tsx', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   fileName: 'SpoilerText.tsx',
 }).outputText
   .replace(/import styles from ['"]\.\/Feed\.module\.css['"];?/, 'const styles = {};')
+  .replace(/from ['"]@\/lib\/reading-progress['"]/, 'from ' + JSON.stringify(progressModule))
   .replace(/from (['"])(react(?:\/jsx-runtime)?|lucide-react)\1/g, (_, _quote, name) => 'from ' + JSON.stringify(import.meta.resolve(name)));
 const { default: SpoilerText } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
 const secret = 'The ending contains a hidden spoiler sentinel.';
@@ -36,6 +41,15 @@ test('thoughts at or before the reader’s bookmark are readable', () => {
     assert.equal(html.includes(secret), true);
     assert.equal(html.includes('>Reveal<'), false);
   }
+});
+
+test('rounded display percentages never reveal a later thought or imply completion', () => {
+  const html = render({ progress: 40.34, readerProgress: 40.31 });
+  assert.equal(html.includes(secret), false, 'Matching display labels must not replace the exact spoiler comparison');
+  assert.match(html, /40\.3%/);
+  const nearEnd = render({ progress: 100, readerProgress: 999 / 1000 * 100 });
+  assert.equal(nearEnd.includes(secret), false);
+  assert.match(nearEnd, /You’re at 99\.9%/);
 });
 
 test('explicit show-all reveals unread and ahead-of-me text', () => {

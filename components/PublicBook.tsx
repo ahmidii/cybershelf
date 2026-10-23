@@ -8,6 +8,8 @@ import { useLibrary } from '@/lib/use-library';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { normalizeBookISBN } from '@/lib/book-size';
 import { readingBookKey } from '@/lib/reading';
+import { pageCountPatch } from '@/lib/reading-progress';
+import { canonicalISBN, spineEditionChanged } from '@/lib/spine-image';
 import type { CatalogBook, CatalogEdition } from '@/lib/book-catalog';
 import { isCommunityReadDate, type BookCommunityMutationResponse, type BookCommunityResponse, type BookCommunityStats, type MyBookCommunity } from '@/lib/book-community';
 import BrandMark from './BrandMark';
@@ -35,8 +37,8 @@ const sameWork = (book: Book, catalog: CatalogBook) => book.catalogId ? book.cat
 const sameEdition = (book: Book, catalog: CatalogBook, edition: CatalogEdition) => {
   if (book.catalogId && book.catalogId !== catalog.id) return false;
   if (book.editionId) return book.editionId === edition.editionId;
-  const isbn = normalizeBookISBN(edition.isbn);
-  return !!isbn && isbn === normalizeBookISBN(book.isbn);
+  const isbn = canonicalISBN(edition.isbn);
+  return !!isbn && isbn === canonicalISBN(book.isbn);
 };
 const formatFor = (value?: string): BookFormat | undefined => {
   if (!value) return undefined;
@@ -168,9 +170,15 @@ function BookPage({ id, accountId }: Props) {
           savedId = existing.id; updatedCopy = !!edition && existing.editionId !== edition.editionId;
           // Selecting an edition can fill an unidentified copy; a copy with a
           // different known edition or ISBN is never silently replaced.
-          return { ...state, books: state.books.map(copy => copy.id !== existing.id ? copy : {
-            ...copy, catalogId: book.id,
-            ...(edition ? { editionId: edition.editionId, ...(edition.isbn ? { isbn: edition.isbn } : {}), ...(edition.pages ? { pages: edition.pages } : {}), ...(format ? { format } : {}), coverUrl: edition.coverUrl || copy.coverUrl || book.coverUrl, ...(copy.dimensions?.source === 'estimated' ? { dimensions: undefined } : {}) } : {}),
+          return { ...state, books: state.books.map(copy => {
+            if (copy.id !== existing.id) return copy;
+            const next = {
+              ...copy, catalogId: book.id,
+              ...(edition ? { editionId: edition.editionId, ...(edition.isbn ? { isbn: edition.isbn } : {}), ...(edition.pages ? pageCountPatch(copy, edition.pages) : {}), ...(format ? { format } : {}), coverUrl: edition.coverUrl || copy.coverUrl || book.coverUrl, ...(copy.dimensions?.source === 'estimated' ? { dimensions: undefined } : {}) } : {}),
+            };
+            return spineEditionChanged(copy, next)
+              ? { ...next, spineUrl: undefined, currentPage: undefined, progress: copy.progress, status: copy.status, finishedAt: copy.finishedAt }
+              : next;
           }) };
         }
         if (state.books.length >= 2000) throw new Error('Your library has reached 2,000 books. Open Library to export a backup and make room before adding another.');

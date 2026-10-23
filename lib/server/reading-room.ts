@@ -1,6 +1,7 @@
 import type { AppState, Book, ReadingComment } from '../types';
 import type { ReadingRoomCommentsResponse, ReadingRoomOrder, ReadingRoomPosition, ReadingRoomResponse } from '../reading-room';
 import { readingBookKey } from '../reading';
+import { currentReadingPage } from '../reading-progress';
 import { HttpError } from './http';
 import { database, getLibrary } from './storage';
 import { idSchema } from './validation';
@@ -48,7 +49,8 @@ export async function readingRoomContext(ownerId: string, bookId: string | null)
   // Do not borrow the greatest progress from another edition. A reader may be
   // deliberately starting this copy again and expects its earlier boundary.
   const progress = book.status === 'read' ? 100 : Math.max(0, Math.min(100, Number.isFinite(book.progress) ? book.progress : 0));
-  const reader: ReadingRoomPosition = { progress, ...(book.pages ? { page: Math.round(book.pages * progress / 100) } : {}) };
+  const page = currentReadingPage(book);
+  const reader: ReadingRoomPosition = { progress, ...(page === undefined ? {} : { page }) };
   return { ownerId, version: library.version, book, key: readingBookKey(book), reader, name: state.profile.name.slice(0, 80) };
 }
 

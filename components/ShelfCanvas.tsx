@@ -53,6 +53,7 @@ type Interaction = {
   mode: PlacementMode;
   target: PlacementTarget | null;
   result: PlacementResult | null;
+  lastValidTarget?: PlacementTarget;
 };
 
 const MODES: { id: PlacementMode; label: string; description: string }[] = [
@@ -83,19 +84,21 @@ function inkFor(color: string) {
 
 function BookObject({ book, facing, ratio }: { book: Book | PublicBook; facing: BookFacing; ratio: number }) {
   const [failedUrl, setFailedUrl] = useState('');
+  const [loadedUrl, setLoadedUrl] = useState('');
   const artwork = facing === 'cover' ? book.coverUrl : book.spineUrl;
+  const hasArtwork = !!artwork && loadedUrl === artwork && failedUrl !== artwork;
   const seed = hash(book.title);
-  return <span className={`${styles.book} ${styles[facing]} ${styles[`pattern${seed % 3}`]}`} style={{
+  return <span className={`${styles.book} ${styles[facing]} ${styles[`pattern${seed % 3}`]} ${hasArtwork ? styles.realArtwork : ''}`} style={{
     '--book-color': book.color || '#78836b', '--book-ink': inkFor(book.color),
     '--stack-art-width': `${100 / ratio}%`, '--stack-art-height': `${100 * ratio}%`,
   } as CSSProperties}>
-    {facing === 'cover' ? <span className={styles.coverArt}>
+    {!hasArtwork && (facing === 'cover' ? <span className={styles.coverArt}>
       <span className={styles.coverAuthor}>{book.author}</span>
       <span className={styles.coverTitle}>{book.title}</span>
       <svg className={styles.coverMotif} viewBox="0 0 60 40" aria-hidden="true"><path d="M7 32C7 17 17 7 30 7s23 10 23 25M18 32c0-9 5-15 12-15s12 6 12 15M7 32h46" /></svg>
-    </span> : <span className={styles.spineText}><span>{book.title}</span><small>{book.author}</small></span>}
-    {artwork && failedUrl !== artwork ? <img className={`${styles.artwork} ${facing === 'stack' ? styles.stackArtwork : ''}`} src={artwork} alt="" loading="lazy" draggable={false} onError={() => setFailedUrl(artwork)} /> : null}
-    {facing === 'spine' ? <span className={styles.publisherMark} aria-hidden="true"><i /><i /></span> : null}
+    </span> : <span className={styles.spineText}><span>{book.title}</span><small>{book.author}</small></span>)}
+    {artwork && failedUrl !== artwork ? <img className={`${styles.artwork} ${facing === 'stack' ? styles.stackArtwork : ''}`} src={artwork} alt="" loading="lazy" draggable={false} onLoad={() => setLoadedUrl(artwork)} onError={() => setFailedUrl(artwork)} /> : null}
+    {facing === 'spine' && !hasArtwork ? <span className={styles.publisherMark} aria-hidden="true"><i /><i /></span> : null}
     <span className={styles.pageEdge} aria-hidden="true" />
   </span>;
 }
@@ -111,17 +114,26 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   const [mode, setMode] = useState<PlacementMode>('auto');
   const [announcement, setAnnouncement] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [touchInput, setTouchInput] = useState(false);
+  const [paletteHeight, setPaletteHeight] = useState(0);
   const [dismissedId, setDismissedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const paletteRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef(new Map<number, HTMLDivElement>());
   const objectRefs = useRef(new Map<string, HTMLButtonElement>());
   const interaction = useRef<Interaction | null>(null);
   const frame = useRef<number | null>(null);
   const autoScrollFrame = useRef<number | null>(null);
   const suppressClickUntil = useRef(0);
+  const suppressControlClickUntil = useRef(0);
   const wheel = useRef({ total: 0, at: 0, eventAt: 0, direction: 0 });
-  const latest = useRef({ shelf, books, geometry, selectedId, selected, interactive, editing, onSelect, onDeselect, onPlace, onBookOpen, onExternalDragEnd, mode });
-  latest.current = { shelf, books, geometry, selectedId, selected, interactive, editing, onSelect, onDeselect, onPlace, onBookOpen, onExternalDragEnd, mode };
+  const latest = useRef({ shelf, books, geometry, selectedId, selected, interactive, editing, onSelect, onDeselect, onPlace, onBookOpen, onExternalDragEnd, mode, touchInput });
+  latest.current = { shelf, books, geometry, selectedId, selected, interactive, editing, onSelect, onDeselect, onPlace, onBookOpen, onExternalDragEnd, mode, touchInput };
+
+  const markInput = (pointerType: string) => {
+    const touch = pointerType === 'touch';
+    setTouchInput(touch); latest.current.touchInput = touch;
+  };
 
   const labelFor = (item?: ShelfItem) => {
     const book = item?.kind === 'book' ? bookMap.get(item.bookId ?? '') : undefined;
@@ -169,12 +181,16 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   const refresh = (session: Interaction, target = session.target) => {
     session.target = target;
     session.result = target ? placeShelfItem(session.baseShelf, session.books, session.itemId, { ...target, mode: session.mode }) : null;
+    if (session.result?.valid && target) session.lastValidTarget = { ...target };
     emitView(session);
   };
   const refreshPointer = () => {
     frame.current = null;
     const session = interaction.current;
     if (!session?.active || session.kind !== 'pointer') return;
+    // A finger can travel down to the style controls without losing its ghost.
+    // Keep the last shelf position while the controls are underneath the finger.
+    if (session.pointerType === 'touch' && document.elementFromPoint(session.point.x, session.point.y)?.closest('[data-shelf-controls]')) return;
     refresh(session, targetAt(session, session.point));
   };
   const schedulePointer = () => {
@@ -225,8 +241,11 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
     const session = interaction.current;
     if (!session?.active || session.kind !== 'pointer') return;
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect && session.point.x >= rect.left - 40 && session.point.x <= rect.right + 40) {
-      const topEdge = 76, bottomEdge = window.innerHeight - 160;
+    const overControls = session.pointerType === 'touch' && document.elementFromPoint(session.point.x, session.point.y)?.closest('[data-shelf-controls]');
+    if (rect && !overControls && session.point.x >= rect.left - 40 && session.point.x <= rect.right + 40) {
+      const topEdge = 76, bottomEdge = session.pointerType === 'touch'
+        ? Math.max(topEdge + 32, Math.min(window.innerHeight - 88, (paletteRef.current?.getBoundingClientRect().top ?? window.innerHeight - 160) - 18))
+        : window.innerHeight - 160;
       const delta = session.point.y < topEdge ? -Math.min(15, (topEdge - session.point.y) * .22)
         : session.point.y > bottomEdge ? Math.min(15, (session.point.y - bottomEdge) * .22) : 0;
       if (delta && ((delta < 0 && rect.top < 0) || (delta > 0 && rect.bottom > bottomEdge))) {
@@ -241,12 +260,15 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
     session.active = true;
     setDismissedId(null);
     latest.current.onSelect?.(session.itemId);
-    setAnnouncement('Lifted. Move to any spot. Scroll or press R to turn. Escape cancels.');
+    setAnnouncement(session.pointerType === 'touch'
+      ? 'Lifted. Drag to place, or use the display styles. Cancel puts it back.'
+      : 'Lifted. Move to any spot. Scroll or press R to turn. Escape cancels.');
     if (autoScrollFrame.current === null && session.kind === 'pointer') autoScrollFrame.current = requestAnimationFrame(() => actions.current?.autoScroll());
   };
   const startPointer = (itemId: string, pointerId: number, point: Point, pointerType: string, external = false, element?: HTMLElement) => {
     const context = latest.current;
     if (!context.interactive || interaction.current || !context.shelf.items.some(item => item.id === itemId)) return;
+    markInput(pointerType);
     const pose = currentPose(itemId), rect = element?.getBoundingClientRect();
     const session: Interaction = {
       itemId, kind: 'pointer', pointerId, pointerType, start: point, point,
@@ -271,10 +293,25 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   const startLift = (itemId: string, kind: 'keyboard' | 'tap') => {
     const context = latest.current, pose = currentPose(itemId);
     if (!context.interactive || interaction.current) return;
-    const session: Interaction = { itemId, kind, pointerId: null, pointerType: '', start: { x: 0, y: 0 }, point: { x: 0, y: 0 }, gripXmm: 0, gripYmm: 0,
+    const session: Interaction = { itemId, kind, pointerId: null, pointerType: kind === 'tap' && context.touchInput ? 'touch' : '', start: { x: 0, y: 0 }, point: { x: 0, y: 0 }, gripXmm: 0, gripYmm: 0,
       active: true, external: false, baseShelf: context.shelf, books: context.books, source: pose?.object, sourceRow: pose?.row ?? 0,
       mode: context.selectedId === itemId ? context.mode : 'auto', target: { row: pose?.row ?? 0, x: pose ? (pose.object.anchorX ?? pose.object.bounds.x + pose.object.bounds.width / 2) / context.geometry.widthMm : .5, y: pose?.object.bounds.y ?? 0 }, result: null };
     interaction.current = session; setMode(session.mode); activate(session); refresh(session);
+  };
+  const parkTouchDrag = (session: Interaction) => {
+    const pointerId = session.pointerId;
+    session.kind = 'tap'; session.pointerId = null;
+    session.gripXmm = 0; session.gripYmm = 0;
+    stopFrames();
+    // Clear the pointer identity before releasing capture: lostpointercapture
+    // must not cancel the preview that is now controlled with taps.
+    if (pointerId !== null) {
+      try { if (canvasRef.current?.hasPointerCapture(pointerId)) canvasRef.current.releasePointerCapture(pointerId); } catch { /* The browser may already have released it. */ }
+    }
+    suppressClickUntil.current = performance.now() + 650;
+    suppressControlClickUntil.current = performance.now() + 650;
+    refresh(session, session.lastValidTarget ?? session.target);
+    setAnnouncement('Preview kept. Choose a style, tap another spot, or place it here.');
   };
   const movePointer = (event: PointerEvent) => {
     const session = interaction.current;
@@ -290,7 +327,11 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
       event.preventDefault();
       session.point = { x: event.clientX, y: event.clientY };
       const overControls = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-shelf-controls]');
-      if (overControls) { cancel(); return; }
+      if (overControls) {
+        if (session.pointerType === 'touch') parkTouchDrag(session);
+        else cancel();
+        return;
+      }
       refresh(session, targetAt(session, session.point)); commit();
     } else {
       clearInteraction(); suppressClickUntil.current = performance.now() + 650;
@@ -329,6 +370,16 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
     if (!session?.active || session.baseShelf.items.find(item => item.id === session.itemId)?.kind !== 'book') return;
     const index = MODES.findIndex(value => value.id === session.mode);
     changeMode(MODES[(index + direction + MODES.length) % MODES.length].id);
+  };
+  const nudge = (direction: 'left' | 'right' | 'up' | 'down') => {
+    const session = interaction.current;
+    if (!session?.active || session.kind === 'pointer') return;
+    const target = { ...(session.target ?? { row: 0, x: .5, y: 0 }) };
+    if (direction === 'left' || direction === 'right') target.x = clamp(target.x + (direction === 'left' ? -1 : 1) * 6 / latest.current.geometry.widthMm, 0, 1);
+    else { target.row = clamp(target.row + (direction === 'up' ? -1 : 1), 0, latest.current.geometry.rows.length - 1); target.y = 0; }
+    refresh(session, target);
+    setAnnouncement(`${session.result?.hint ?? 'Move to another spot.'} Row ${target.row + 1}.`);
+    rowRefs.current.get(target.row)?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   };
   const handleWheel = (event: WheelEvent) => {
     const session = interaction.current;
@@ -371,7 +422,13 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   const actions = useRef({ refreshPointer, autoScroll, movePointer, finishPointer, handleWheel, handleKey, cancel });
   actions.current = { refreshPointer, autoScroll, movePointer, finishPointer, handleWheel, handleKey, cancel };
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+    const query = window.matchMedia('(pointer: coarse)');
+    const update = () => setTouchInput(query.matches);
+    update(); query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
   useEffect(() => {
     if (!interactive) return;
     const move = (event: PointerEvent) => actions.current.movePointer(event);
@@ -417,6 +474,10 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
 
   const pressObject = (event: ReactPointerEvent<HTMLButtonElement>, item: ShelfItem) => {
     if (!interactive || event.button !== 0 || !event.isPrimary || interaction.current) return;
+    markInput(event.pointerType);
+    // Browsing a shelf on a phone should scroll like the rest of the page.
+    // Arrange mode (or a deliberately selected book) opts into direct dragging.
+    if (event.pointerType === 'touch' && !editing && (selectedId !== item.id || selectedId === dismissedId)) return;
     // A tray book or a deliberately lifted item can be placed onto another book.
     if (selected?.slot === null && selected.id !== item.id && selectedId !== dismissedId) return;
     event.preventDefault(); event.stopPropagation();
@@ -445,6 +506,7 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   };
   const keyObject = (event: ReactKeyboardEvent<HTMLButtonElement>, item: ShelfItem) => {
     if (!interactive) return;
+    setTouchInput(false); latest.current.touchInput = false;
     if (interaction.current?.active) { handleKey(event); return; }
     if (event.key === ' ' || event.key.toLowerCase() === 'r' || ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
       event.preventDefault(); event.stopPropagation(); startLift(item.id, 'keyboard');
@@ -464,7 +526,10 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
     if (!active || active.kind === 'pointer') return;
     const target = targetAt(active, { x: event.clientX, y: event.clientY }, false);
     if (!target) return;
-    refresh(active, { ...target, row }); commit();
+    refresh(active, { ...target, row });
+    if (active.kind === 'tap' && active.pointerType === 'touch') {
+      setAnnouncement(`${active.result?.hint ?? 'Move to another spot.'} Preview ready. Choose a style or place it here.`);
+    } else commit();
   };
   const renderArtwork = (item: ShelfItem, object: PlacedShelfObject) => {
     const book = item.kind === 'book' ? bookMap.get(item.bookId ?? '') : undefined;
@@ -481,6 +546,15 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   const visibleGeometry = active && view.result ? view.result.geometry : geometry;
   const activeItem = itemMap.get(view?.itemId ?? selectedId ?? '');
   const paletteVisible = interactive && !!activeItem && (active || selectedId !== dismissedId);
+  useLayoutEffect(() => {
+    const node = paletteRef.current;
+    if (!mounted || !paletteVisible || !touchInput || !node) { setPaletteHeight(0); return; }
+    const measure = () => setPaletteHeight(Math.ceil(node.getBoundingClientRect().height) + 24);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [mounted, paletteVisible, touchInput]);
   const renderObject = (object: PlacedShelfObject) => {
     const item = itemMap.get(object.itemId);
     if (!item) return null;
@@ -501,9 +575,20 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
       {renderArtwork(item, object)}
     </button>;
   };
-  const palette = paletteVisible && activeItem ? <div className={styles.palette} data-shelf-controls="true" role="group" aria-label="Book placement controls" aria-describedby={instructionsId}
-    onPointerDown={event => event.stopPropagation()}>
-    <div className={styles.paletteHeading}><span>{labelFor(activeItem).split(', by ')[0]}</span><button type="button" onClick={() => cancel(true)} aria-label={active ? 'Cancel placement' : 'Done arranging'}>{active ? 'Cancel' : 'Done'}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg></button></div>
+  const palette = paletteVisible && activeItem ? <div ref={paletteRef} className={`${styles.palette} ${touchInput ? styles.touchPalette : ''}`} data-shelf-controls="true" role="group" aria-label="Book placement controls" aria-describedby={instructionsId}
+    onPointerDown={event => {
+      event.stopPropagation();
+      markInput(event.pointerType);
+      // A fresh contact is intentional; ignore only the synthetic click from a
+      // drag ending on this panel, which had no pointerdown on the controls.
+      if (event.isPrimary) suppressControlClickUntil.current = 0;
+    }}
+    onClickCapture={event => {
+      if (performance.now() < suppressControlClickUntil.current) { event.preventDefault(); event.stopPropagation(); }
+    }}>
+    <div className={styles.paletteHeading}><span>{labelFor(activeItem).split(', by ')[0]}</span><button type="button"
+      onPointerDown={event => { if (event.pointerType === 'touch' && !event.isPrimary && interaction.current?.active) { event.preventDefault(); cancel(true); } }}
+      onClick={() => cancel(true)} aria-label={active ? 'Cancel placement' : 'Done arranging'}>{active ? 'Cancel' : 'Done'}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg></button></div>
     {activeItem.kind === 'book' ? <div className={styles.modeOptions} role="group" aria-label="Display style">
       {MODES.map(option => <button type="button" key={option.id} aria-pressed={(view?.mode ?? mode) === option.id}
         className={(view?.mode ?? mode) === option.id ? styles.modeActive : ''}
@@ -511,18 +596,36 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
         onPointerDown={event => { if (event.pointerType === 'touch' && !event.isPrimary && interaction.current?.active) { event.preventDefault(); changeMode(option.id); } }}
         onClick={() => changeMode(option.id)}><ModeIcon mode={option.id} /><span>{option.label}</span></button>)}
     </div> : null}
-    <div className={styles.paletteFooter}><span>{active ? view.result?.hint || 'Bring it over a shelf.' : activeItem.slot === null ? 'Tap a spot on the shelf, or drag it in.' : activeItem.kind === 'decor' ? 'Drag anywhere, including onto a stack.' : 'Drag anywhere. Scroll while holding to turn.'}</span>
+    {touchInput && active && view.kind === 'tap' ? <div className={styles.touchNudges} role="group" aria-label="Fine tune placement">
+      <span>Fine tune<small>Row {(view.target?.row ?? view.sourceRow) + 1} of {geometry.rows.length}</small></span>
+      {(['left', 'up', 'down', 'right'] as const).map(direction => <button type="button" key={direction}
+        aria-label={direction === 'up' ? 'Move to shelf above' : direction === 'down' ? 'Move to shelf below' : `Move a little ${direction}`}
+        disabled={direction === 'up' ? (view.target?.row ?? view.sourceRow) === 0 : direction === 'down' ? (view.target?.row ?? view.sourceRow) === geometry.rows.length - 1 : false}
+        onClick={() => nudge(direction)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ transform: `rotate(${direction === 'left' ? 180 : direction === 'up' ? -90 : direction === 'down' ? 90 : 0}deg)` }}><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>)}
+    </div> : null}
+    <div className={styles.paletteFooter}><span>{active
+      ? touchInput && view.kind === 'tap' ? view.result?.valid ? 'Tap another spot, try a style, or place it here.' : view.result?.hint || 'Tap a spot on the shelf to preview.' : view.result?.hint || 'Bring it over a shelf.'
+      : activeItem.slot === null ? touchInput ? 'Pick up to preview, or drag it onto a shelf.' : 'Tap a spot on the shelf, or drag it in.'
+        : touchInput ? 'Drag to move. Pick up to preview with one hand.'
+          : activeItem.kind === 'decor' ? 'Drag anywhere, including onto a stack.' : 'Drag anywhere. Scroll while holding to turn.'}</span>
       {active && view.kind !== 'pointer' ? <button type="button" className={styles.placeButton} onClick={commit} disabled={!view.result?.valid}>Place here</button>
         : !active ? <button type="button" className={styles.moveButton} onClick={() => startLift(activeItem.id, 'tap')}>{activeItem.slot === null ? 'Place on shelf' : 'Pick up'}</button> : null}
     </div>
   </div> : null;
 
   return <div ref={canvasRef} className={`${styles.canvas} ${styles[shelf.finish]} ${styles[shelf.bookcase]} ${interactive ? styles.interactive : ''} ${editing ? styles.editing : ''} ${active ? styles.inMotion : ''} ${compact ? styles.compact : ''}`}
-    style={{ '--row-width': geometry.widthMm, '--row-height': geometry.rowHeightMm } as CSSProperties}
+    style={{ '--row-width': geometry.widthMm, '--row-height': geometry.rowHeightMm, '--palette-clearance': `${paletteHeight}px` } as CSSProperties}
+    onPointerDownCapture={event => {
+      if (interactive && event.isPrimary) markInput(event.pointerType);
+      if (event.isPrimary && event.pointerType === 'touch' && interaction.current?.kind === 'tap') suppressClickUntil.current = 0;
+    }}
     onLostPointerCapture={event => { if (interaction.current?.pointerId === event.pointerId) cancel(); }}
     role={compact ? 'img' : 'group'} aria-label={`${shelf.title} bookshelf`}>
-    {interactive && editing ? <p className={styles.placementHint}>Drag to any spot. Scroll while holding to turn. Books find their footing.</p> : null}
-    {interactive ? <span className={styles.srOnly} id={instructionsId}>Drag to move. Press Space to pick up, arrows to move, R to turn, Enter to place, or Escape to cancel. Shift and arrow moves a little. Alt and up or down adjusts stacking height.</span> : null}
+    {interactive && (editing || touchInput) ? <p className={styles.placementHint}>{touchInput
+      ? editing ? 'Drag books into place. Tap a book for display styles.' : 'Tap Arrange shelf to move books. Swipe to browse.'
+      : 'Drag to any spot. Scroll while holding to turn. Books find their footing.'}</p> : null}
+    {interactive ? <span className={styles.srOnly} id={instructionsId}>In Arrange shelf, drag to move and release to place. Tap a book for display styles. Pick up lets you tap a location, preview styles, and choose Place here. Press Space to pick up, arrows to move, R to turn, Enter to place, or Escape to cancel. Shift and arrow moves a little. Alt and up or down adjusts stacking height.</span> : null}
     <div className={styles.case} aria-hidden={compact || undefined}>
       {visibleGeometry.rows.map(row => <div className={`${styles.row} ${active && view.target?.row === row.index ? styles.targetRow : ''}`} key={row.index}>
         <div className={styles.scene} data-shelf-row={row.index} ref={node => { if (node) rowRefs.current.set(row.index, node); else rowRefs.current.delete(row.index); }}
@@ -535,6 +638,7 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
       </div>)}
     </div>
     <div className={styles.feet} aria-hidden="true"><i /><i /></div>
+    {paletteVisible && touchInput ? <div className={styles.paletteClearance} aria-hidden="true"/> : null}
     {interactive ? <span className={styles.srOnly} role="status" aria-live="polite" aria-atomic="true">{announcement}</span> : null}
     {mounted && palette ? createPortal(palette, document.body) : null}
     {mounted && active && view.kind === 'pointer' ? createPortal(<div className={`${styles.dragTag} ${view.result && !view.result.valid ? styles.dragTagBlocked : ''}`}

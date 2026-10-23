@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { displayReadingProgress } from '@/lib/reading-progress';
 import styles from './Feed.module.css';
 
 export interface SpoilerTextProps {
@@ -16,7 +17,7 @@ export default function SpoilerText({ progress, readerProgress, unread, body, de
   return <div className={styles.spoiler}>
     {hidden ? <div className={styles.spoilerGuard}>
       <ShieldCheck size={19} aria-hidden="true" /><div><strong>{unread ? 'Save this for later' : 'A little ahead of your bookmark'}</strong>
-        <p>{unread ? 'This book is unread or not in your library.' : `This update reaches ${Math.round(progress)}%. You’re at ${Math.round(readerProgress)}%.`}</p></div>
+        <p>{unread ? 'This book is unread or not in your library.' : `This update reaches ${displayReadingProgress(progress)}%. You’re at ${displayReadingProgress(readerProgress)}%.`}</p></div>
       <button type="button" className="button secondary small" onClick={() => setRevealedKey(key)} aria-expanded="false"><Eye size={14} />Reveal</button>
     </div> : <>
       <p className={styles.body}>{body}</p>
