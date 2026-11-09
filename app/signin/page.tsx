@@ -20,5 +20,5 @@ export default async function SignInPage({ searchParams }: {
   const reauthenticate = params.reauth === '1';
   const user = availability.available ? await getCurrentUser() : null;
   if (user && !reauthenticate) redirect(returnTo);
-  return <SignIn returnTo={returnTo} available={availability.available} emailAvailable={availability.emailAvailable} reauthenticate={reauthenticate} initialEmail={reauthenticate ? user?.email : undefined}/>;
+  return <SignIn returnTo={returnTo} available={availability.available} reauthenticate={reauthenticate} initialIdentifier={reauthenticate ? user?.username || user?.email || '' : ''}/>;
 }

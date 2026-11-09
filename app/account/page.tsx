@@ -15,5 +15,5 @@ export default async function AccountPage({ searchParams }: {
   const user = await requireCurrentUser('/account');
   const params = await searchParams;
   const { emailAvailable } = getAuthAvailability();
-  return <AccountSettings user={user} emailAvailable={emailAvailable} verificationError={!!params.error && !user.emailVerified}/>;
+  return <AccountSettings key={user.userId} user={user} emailAvailable={emailAvailable} verificationError={!!params.error && !!user.email && !user.emailVerified}/>;
 }

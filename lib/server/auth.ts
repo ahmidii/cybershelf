@@ -1,10 +1,21 @@
 import { betterAuth } from 'better-auth/minimal';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { username } from 'better-auth/plugins/username';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../db/schema';
 import { AUTH_EMAIL_MAX_LENGTH, AUTH_NAME_MAX_LENGTH, AUTH_PASSWORD_MAX_LENGTH, AUTH_PASSWORD_MIN_LENGTH } from '../auth-contract';
 import { authEmailConfiguration, sendAuthEmail, type AuthEmailBindings, type AuthEmailPurpose } from './auth-email';
+import { isInternalAccountEmail, normalizeUsername, usernameValidationError } from '../account-identity';
+import { hashAccountPassword, PasswordWorkLimitError, validateNewAccountPassword, verifyAccountPassword } from './passwords';
+
+async function passwordWork<T>(operation: () => Promise<T>): Promise<T> {
+  try { return await operation(); }
+  catch (error) {
+    if (error instanceof PasswordWorkLimitError) throw new APIError('SERVICE_UNAVAILABLE', { code: 'ACCOUNT_BUSY', message: 'Account sign-in is busy. Please try again shortly.' });
+    throw error;
+  }
+}
 
 export type AuthBindings = AuthEmailBindings & {
   DB?: D1Database;
@@ -41,12 +52,12 @@ export function authConfiguration(bindings: AuthBindings) {
 
 // Construct inside the request context: D1 bindings are scoped to the Worker.
 // Never infer identity, trusted origins, or cookie configuration from headers.
-export function createAuth(bindings: AuthBindings, waitUntil?: (promise: Promise<unknown>) => void) {
+export function createAuth(bindings: AuthBindings, waitUntil?: (promise: Promise<unknown>) => void, trusted?: { usernameSignUp?: boolean }) {
   const config = authConfiguration(bindings);
   const emailConfig = authEmailConfiguration(bindings);
   const db = drizzle(config.database, { schema });
   const queueEmail = async (purpose: AuthEmailPurpose, data: { user: { email: string }; url: string }) => {
-    if (!emailConfig) return;
+    if (!emailConfig || isInternalAccountEmail(data.user.email)) return;
     const delivery = sendAuthEmail(emailConfig, { purpose, to: data.user.email, origin: config.origin, url: data.url }).catch(() => {
       // Never disclose account existence through provider errors or log links,
       // addresses, credentials, provider payloads, or reset/verification tokens.
@@ -65,10 +76,40 @@ export function createAuth(bindings: AuthBindings, waitUntil?: (promise: Promise
     // diagnostics useful without emitting account details or credential material.
     logger: { level: 'error', log: () => console.error('cybershelf authentication service reported an error') },
     database: drizzleAdapter(db, { provider: 'sqlite', schema, transaction: false }),
+    plugins: [username({
+      displayUsername: false,
+      immutableUsername: true,
+      minUsernameLength: 3,
+      maxUsernameLength: 30,
+      usernameNormalization: normalizeUsername,
+      usernameValidator: value => !usernameValidationError(value),
+    })],
+    disabledPaths: ['/is-username-available'],
+    hooks: { before: createAuthMiddleware(async context => {
+      // Claiming a first username is a sensitive account change. The protected
+      // account route checks the current password and fresh session atomically.
+      if (context.path === '/update-user' && context.body && ['username', 'displayUsername', 'email'].some(key => key in context.body)) {
+        throw new APIError('BAD_REQUEST', { code: 'PROTECTED_ACCOUNT_CHANGE', message: 'Use Account & security to change account sign-in details.' });
+      }
+      const field = context.path === '/sign-up/email' ? 'password'
+        : context.path === '/change-password' || context.path === '/reset-password' ? 'newPassword' : null;
+      if (field && typeof context.body?.[field] === 'string') {
+        const message = validateNewAccountPassword(context.body[field], {
+          username: typeof context.body.username === 'string' ? context.body.username : undefined,
+          email: typeof context.body.email === 'string' ? context.body.email : undefined,
+          name: typeof context.body.name === 'string' ? context.body.name : undefined,
+        });
+        if (message) throw new APIError('BAD_REQUEST', { code: 'PASSWORD_POLICY', message });
+      }
+    }) },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: AUTH_PASSWORD_MIN_LENGTH,
       maxPasswordLength: AUTH_PASSWORD_MAX_LENGTH,
+      password: {
+        hash: password => passwordWork(() => hashAccountPassword(password)),
+        verify: credentials => passwordWork(() => verifyAccountPassword(credentials)),
+      },
       autoSignIn: true,
       // Keep existing accounts usable while confirmation is introduced. Email
       // readiness is separate from account readiness; no-mail installs still work.
@@ -101,6 +142,7 @@ export function createAuth(bindings: AuthBindings, waitUntil?: (promise: Promise
       customRules: {
         '/sign-up/email': { window: 60, max: 5 },
         '/sign-in/email': { window: 60, max: 10 },
+        '/sign-in/username': { window: 60, max: 10 },
         '/request-password-reset': { window: 60, max: 3 },
         '/send-verification-email': { window: 60, max: 3 },
         '/reset-password': { window: 60, max: 5 },
@@ -119,6 +161,9 @@ export function createAuth(bindings: AuthBindings, waitUntil?: (promise: Promise
         create: {
           before: async (user) => {
             const name = user.name.trim();
+            if (isInternalAccountEmail(user.email) && !trusted?.usernameSignUp) {
+              throw new APIError('BAD_REQUEST', { code: 'INVALID_EMAIL', message: 'Use a valid email address, or create an account with a username.' });
+            }
             if (!name || name.length > AUTH_NAME_MAX_LENGTH || user.email.length > AUTH_EMAIL_MAX_LENGTH) {
               throw new APIError('BAD_REQUEST', { code: 'INVALID_ACCOUNT_DETAILS', message: 'Use a name of 1–80 characters and a valid email address.' });
             }

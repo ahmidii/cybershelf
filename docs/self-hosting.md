@@ -101,7 +101,7 @@ Reference: [Worker Custom Domains](https://developers.cloudflare.com/workers/con
 
 Open the custom domain, create an account, add a book and a shelf, and reload to confirm they persist. Upload a small EPUB/PDF and retrieve it through **Grab this book**. Sign out and sign back in. Publish a shelf and open its share link in a signed-out window; that link should show the chosen shelf without private notes, source links, or book originals.
 
-If a private API reports a database error, check that all seven committed migrations completed successfully. If authentication is unavailable, check the runtime secret and exact origin. If requests fail with a Worker CPU-limit error, inspect Cloudflare's invocation metrics and plan limits. The Free plan has a small per-request CPU allowance; a local test does not establish that a complete production auth request fits it. The maintained authentication dependency uses native scrypt on Workers, without reducing password-hash strength to meet a plan limit.
+If a private API reports a database error, check that all eight committed migrations completed successfully. If authentication is unavailable, check the runtime secret and exact origin. If requests fail with a Worker CPU-limit error, inspect Cloudflare's invocation metrics and plan limits. The Free plan has a small per-request CPU allowance; a local test does not establish that a complete production auth request fits it. Cybershelf uses native scrypt on Workers, with a bounded derivation queue and stronger parameters for new passwords, without reducing password-hash strength to meet a plan limit.
 
 Reference: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 
@@ -121,7 +121,7 @@ Basic accounts do not require a mail provider. Password recovery and confirmatio
 4. Choose **Deploy** to apply the runtime settings. These settings survive later GitHub deployments. A syntax-valid configuration enables the UI; it cannot establish whether the provider has verified the sender or will deliver to a particular inbox.
 5. With your own account, use **Account & security → Send verification link** and confirm the message. Then request a reset for your own address and check inbox/spam delivery. Never use another reader's email as a deployment test.
 
-The app sends a confirmation link on signup after email is enabled. Confirmation remains optional for sign-in so existing readers are not locked out. Email confirmation does not create a session or switch the current account. Password reset links expire after one hour, can only be used once, and revoke existing sessions; the reader signs in again with the new password. Verification links expire after 24 hours.
+Existing email accounts can receive confirmation and recovery links after email is enabled. Username-only signup does not send mail or collect a real email address. Confirmation remains optional for sign-in so existing readers are not locked out. Email confirmation does not create a session or switch the current account. Password reset links expire after one hour, can only be used once, and revoke existing sessions; the reader signs in again with the new password. Verification links expire after 24 hours.
 
 Reset requests use the same response for known and unknown addresses. Provider delivery errors are logged as a fixed message without addresses, tokens, keys, or provider payloads. Messages run through the Worker's `waitUntil` lifecycle. Auth/recovery pages use no-store, no-referrer, and noindex protections. `email: true` in `/api/health` means the two settings are syntactically ready, not that a message reached an inbox.
 
@@ -131,7 +131,11 @@ References: [Better Auth email/password](https://better-auth.com/docs/authentica
 
 Accounts use Better Auth, signed HTTP-only cookies, database-backed sessions, and database-backed authentication rate limits. Sign-out is a POST. Raw identity headers cannot authenticate a request. A separate account precondition prevents an old tab from saving into another account after a session switch.
 
-This release supports email/password signup and sign-in without an external email service. The account page supports password changes and signing out other devices. Password changes require the current password and revoke other sessions; an older session can sign in again through the explicit reauthentication flow. Automatic account linking and email-address changes remain disabled.
+The 0.8 candidate supports username/password signup without an external email service. Save the recovery key after signup. The authentication schema uses a random internal non-deliverable address; it is not a contact address, receives no mail, and is hidden by the account UI. Existing email accounts keep their email sign-in and can claim a username. Username claims and recovery-key replacements require a recent sign-in and the current password.
+
+The account page supports password changes and signing out other devices. Password changes require the current password and revoke other sessions; an older session can sign in again through the explicit reauthentication flow. Recovery with a key changes the password, replaces the key, removes outstanding email-reset tokens, and revokes all sessions without automatically signing in. Automatic account linking and email-address changes remain disabled. An account without email has no supported recovery route if both its password and recovery key are lost. Do not improvise ownership verification through public profile information.
+
+The [release status](release-status.md) records the pending authentication dependency update. Do not treat a successful local candidate build as approval to deploy before that hold is resolved.
 
 **Production email remains an owner activation step.** Until the provider settings above are present, the interface says verification/recovery are unavailable. Do not advertise delivered recovery email until your own inbox test passes. Browser-draft imports preserve the account name, and failed library saves offer an export or explicit discard before signout.
 

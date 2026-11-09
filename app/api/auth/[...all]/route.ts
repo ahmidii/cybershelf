@@ -2,6 +2,8 @@ import { env } from 'cloudflare:workers';
 import { getRequestExecutionContext } from 'vinext/shims/request-context';
 import { AuthConfigurationError, authConfiguration, createAuth } from '../../../../lib/server/auth';
 import { ACCOUNT_ID_HEADER } from '../../../../lib/auth-contract';
+import { signUpWithUsername } from '../../../../lib/server/username-accounts';
+import { isInternalAccountEmail } from '../../../../lib/account-identity';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,9 @@ async function handle(request: Request): Promise<Response> {
     const auth = createAuth(env, context ? promise => context.waitUntil(promise) : undefined);
     const url = new URL(request.url);
     const path = decodeURIComponent(url.pathname).replace(/\/+$/, '');
+    if (path === '/api/auth/sign-up/username') {
+      return signUpWithUsername(request, env, context ? promise => context.waitUntil(promise) : undefined);
+    }
     if (request.method === 'POST' && ACCOUNT_MUTATIONS.has(path)) {
       const session = await auth.api.getSession({ headers: request.headers });
       if (session && request.headers.get(ACCOUNT_ID_HEADER) !== session.user.id) {
@@ -44,6 +49,14 @@ async function handle(request: Request): Promise<Response> {
     const response = await auth.handler(request);
     const headers = new Headers(response.headers);
     for (const [name, value] of Object.entries(PRIVATE_HEADERS)) headers.set(name, value);
+    // The auth adapter needs a non-deliverable identifier for username-only
+    // accounts. It is never a reader's email and does not leave the server.
+    if (response.ok && response.body && response.status !== 204 && response.status !== 205 && headers.get('content-type')?.includes('application/json')) {
+      const body = await response.json() as { user?: { email?: unknown } } | null;
+      if (body?.user && isInternalAccountEmail(body.user.email)) body.user.email = null;
+      headers.delete('content-length');
+      return Response.json(body, { status: response.status, statusText: response.statusText, headers });
+    }
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   } catch (error) {
     if (error instanceof AuthConfigurationError) {

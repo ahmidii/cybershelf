@@ -1,4 +1,33 @@
-# Release status — 0.7.0
+# Release status — 0.8.0 beta candidate
+
+Updated 2026-11-09.
+
+## Candidate and deployment hold
+
+The 0.8.0-beta.1 source prepares username/password accounts without a required real email address, recovery keys, stronger new-password handling, and clearer privacy information. Existing email logins remain supported. It adds one migration, `0007_username_accounts`, for a nullable unique username and recovery/rate-limit records; it does not replace existing accounts, libraries, resource bindings, or secrets.
+
+**This candidate is not deployed.** The existing production baseline remains 0.7.0, commit `3f8614061dc21a58cf57a4b39d957814cf65d68d`. A read-only check on 2026-11-09 returned HTTP 200 from `/signin` and `/api/health`, with `accounts: true` and `email: true`. Those capability flags are not a security certification or an end-to-end test of delivery to a real inbox.
+
+Better Auth's [November 3 security release](https://better-auth.com/blog/security-release-2026-11-03) recommends stable 1.7.16. The attempted update was blocked by the repository's seven-day minimum dependency release age. Installed dependencies and the lockfile remain at 1.7.8. The policy has not been bypassed. Either wait until the required releases have aged, or approve exact-version exceptions for the security update; then install and repeat the build and account checks before deployment. The latest blocked release matures around 2026-11-10 21:25 UTC.
+
+Checks against the existing installed 1.7.8 package do not establish compatibility with the pending 1.7.16 update. The managed preview daemon is unavailable in this workspace, so no new browser or physical-device verification is claimed for this candidate.
+
+### Candidate verification — 2026-11-09
+
+- TypeScript passed, and the production Worker build completed.
+- 181 regression cases passed with a complete terminal summary, no failures, skips, or cancellations. These include password-format compatibility, username/key validation, and seven real-React account/privacy rendering tests.
+- All eight migrations applied to disposable D1. The full built-Worker suite passed with local D1/R2 and an intercepted email transport; it did not use production data or send external email.
+- The Worker checks covered existing email signup/verification/reset/change flows, private account and asset isolation, stale-account tabs, native session cookies and persistent limits, username normalization and concurrent signup, suppression of email for username accounts, fresh-password/fresh-session requirements, recovery-key rotation and replay refusal, exactly one winner for concurrent recovery, revocation of all sessions and pending email-reset credentials, and preservation of legacy 12-character passwords and private data.
+- A simulated key-storage failure verified that a partially created account remains usable and directs the reader to sign in and finish recovery setup. The simulation uses a disposable local database trigger only.
+- Native Workerd password probes passed new and legacy hash verification, concurrent request contexts, and bounded queue overload. These are local behavior and wall-time checks, not proof of the production plan's billed CPU allowance.
+- A combined integration run caught an email-verification redirect regression in the new response wrapper. The wrapper was corrected to leave redirects untouched, rebuilt, and the complete suite then passed. No affected build was deployed.
+- `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `wrangler.jsonc`, the production main branch, and existing secrets were unchanged during verification.
+
+No independent penetration test, dashboard configuration audit, production restore drill, or new physical-device gesture test was performed. The native preview daemon's missing mailbox prevented browser interaction testing in this workspace.
+
+See [beta readiness](beta-readiness.md) for the rollout recommendation, privacy boundaries, and remaining account deletion, abuse response, upload quota, and operational work.
+
+## Previous deployed release — 0.7.0
 
 Updated 2026-10-23.
 

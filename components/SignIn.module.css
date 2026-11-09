@@ -131,6 +131,9 @@
 .submit:disabled { opacity: .75; }
 .browse { padding-top: 23px; margin-top: 25px; border-top: 1px solid #e5e5dc; color: #6a735f; font-size: 11px; text-align: center; line-height: 1.8; }
 .browse a { color: #4a6046; white-space: nowrap; }
+.privacyLink { margin-top: 18px; font-size: 10px; line-height: 1.8; color: #6a735f; text-align: center; }
+.privacyLink a, .footer a { text-decoration: underline; text-underline-offset: 3px; }
+.footer a { margin-left: 12px; }
 .error, .setupNotice { margin-bottom: 22px; padding: 13px 14px; border-radius: 5px; font-size: 12px; line-height: 1.8; }
 .error { background: #f8eee7; color: #80503b; border: 1px solid #e9d7c9; }
 .setupNotice { background: #edf0e4; color: #58694b; border: 1px solid #dce3cf; }

@@ -50,6 +50,13 @@
       "when": 1792676871136,
       "tag": "0006_book_community",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794224834290,
+      "tag": "0007_username_accounts",
+      "breakpoints": true
     }
   ]
 }

@@ -51,6 +51,35 @@
 .accountName { font-size: 12px; line-height: 1.7; color: #6a7565; margin-bottom: 6px; }
 .privacy { display: flex; align-items: flex-start; gap: 8px; color: #7b8272; font-size: 11px; line-height: 1.8; margin-top: 26px; }
 .privacy svg { margin-top: 3px; }
+.privacy a { text-decoration: underline; text-underline-offset: 3px; }
+.identityLabel { font-size: 10px; color: #747e6b; margin-bottom: 4px; }
+.identityName { font-size: 18px; line-height: 1.7; overflow-wrap: anywhere; margin-bottom: 14px; }
+.emailSection { margin-top: 23px; padding-top: 21px; border-top: 1px solid var(--line); }
+.emailSection .sectionHeading h3 { font-family: var(--serif); font-size: 22px; font-weight: 400; letter-spacing: -.4px; }
+.formSpacing { margin-top: 20px; }
+.recoveryMethods { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 6px; background: #efefe7; margin: 0 0 25px; }
+.recoveryMethods button { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 8px; font-size: 12px; color: #68715f; }
+.recoveryMethods .chosenMethod { color: var(--ink); background: #fcfbf7; box-shadow: 0 1px 3px #2b352d0d; }
+.keyPanel { min-width: 0; }
+.keyPanel h2 { font-family: var(--serif); font-size: 26px; font-weight: 400; letter-spacing: -.55px; line-height: 1.2; }
+.keyPanel .description { margin: 0 0 16px; }
+.keyPanel > .hint { margin: 12px 0; }
+.keyLabel { display: block; margin: 20px 0 9px; font-size: 12px; color: #4b5747; font-weight: 500; }
+.keyValue { display: block; width: 100%; min-height: 95px; resize: vertical; padding: 14px; border: 1px solid #ccd5be; border-radius: 5px; background: #f0f3e8; color: #334d32; font: 14px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing: .04em; overflow-wrap: anywhere; }
+.keyActions { display: flex; flex-wrap: wrap; gap: 9px; margin: 12px 0 18px; }
+.keyActions > button { flex: 1 1 125px; }
+.keyWarning { font-size: 11px; line-height: 1.85; color: #766445; padding: 12px 14px; background: #f1eee1; border: 1px solid #e7dfc9; border-radius: 5px; }
+.keyAcknowledgement { display: flex; align-items: flex-start; gap: 10px; padding: 15px 0; font-size: 12px; line-height: 1.8; color: #4b5747; cursor: pointer; }
+.keyAcknowledgement input { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 2px; accent-color: var(--green); }
+.keyChecking { display: flex; align-items: center; gap: 9px; padding: 24px 0; font-size: 12px; color: #68765f; }
+.document { max-width: 760px; }
+.document section { margin: 29px 0; }
+.document h2 { font-family: var(--serif); font-size: 26px; font-weight: 400; line-height: 1.3; margin-bottom: 12px; }
+.document p, .document li { color: #65715d; font-size: 13px; line-height: 1.9; }
+.document p + p { margin-top: 12px; }
+.document ul { padding-left: 22px; margin: 12px 0; list-style: disc; }
+.document a { color: #3c5835; text-decoration: underline; text-underline-offset: 3px; }
+.document strong { color: #42533b; font-weight: 600; }
 .footer { display: flex; justify-content: space-between; gap: 20px; max-width: 1240px; width: 100%; margin: 0 auto; border-top: 1px solid var(--line); padding: 21px 0 25px; color: #6c7563; font-size: 10px; line-height: 1.6; }
 .spinner { animation: accountTurn 1s linear infinite; }
 @keyframes accountTurn { to { transform: rotate(360deg); } }
@@ -62,6 +91,7 @@
   .grid { grid-template-columns: minmax(0, 1fr); }
   .card { padding: 25px; }
   .field input { font-size: 16px; }
+  .keyValue { font-size: 16px; }
   .main { padding-top: 38px; padding-bottom: 45px; }
   .intro { margin-bottom: 26px; }
 }

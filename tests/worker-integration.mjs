@@ -9,6 +9,7 @@ import { runIntegration } from '../lib/server/integration.test.mjs';
 import { runReadingRoomIntegration } from '../lib/server/reading-room.integration.mjs';
 import { runBookCommunityIntegration } from '../lib/server/book-community.integration.mjs';
 import { runAccountLifecycleIntegration } from '../lib/server/account-lifecycle.integration.mjs';
+import { runUsernameAccountIntegration } from '../lib/server/username-accounts.integration.mjs';
 
 // Reuse Wrangler's pinned Miniflare without adding a second runtime version.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -104,6 +105,9 @@ try {
   if (!accountsOnly) {
   const home = await requestFetch(base + '/');
   assert.equal(home.status, 200, 'Guest home renders in workerd');
+  assert.equal(home.headers.get('Referrer-Policy'), 'no-referrer', 'External artwork does not receive the reading page URL');
+  assert.equal(home.headers.get('X-Frame-Options'), 'DENY', 'Library and sharing controls cannot be framed by another site');
+  assert.match(home.headers.get('Content-Security-Policy'), /frame-ancestors 'none'/);
   assert.match(await home.text(), /cybershelf/i);
   const signIn = await requestFetch(base + '/signin');
   assert.equal(signIn.status, 200, 'Standalone sign-in page renders in workerd');
@@ -123,7 +127,7 @@ try {
   const hashes = await database.prepare('SELECT password FROM auth_account').all();
   assert.ok(hashes.results.length >= 2);
   for (const row of hashes.results) {
-    assert.match(row.password, /^[a-f0-9]{32}:[a-f0-9]{128}$/, 'Credential accounts contain salted scrypt hashes');
+    assert.match(row.password, /^cs_scrypt_v1\$32768\$8\$3\$[a-f0-9]{32}\$[a-f0-9]{128}$/, 'New credential accounts contain the versioned, salted scrypt hash');
   }
   const counters = await database.prepare('SELECT COUNT(*) AS total FROM auth_rate_limit').first();
   assert.ok(counters.total > 0, 'Rate-limit counters are persisted in D1');
@@ -161,6 +165,8 @@ try {
     });
   };
   await runAccountLifecycleIntegration({ base, fetch: mailFetch, database: mailDatabase, mailbox, report: message => console.log('✓ ' + message) });
+  mailbox.fail = false;
+  await runUsernameAccountIntegration({ base, fetch: mailFetch, database: mailDatabase, mailbox, report: message => console.log('✓ ' + message) });
   console.log('Worker integration checks passed; no external resources were used.');
 } finally {
   for (const waiting of mailbox.waiting) clearTimeout(waiting.timeout);

@@ -48,6 +48,7 @@ export const readingEvents=sqliteTable('reading_events',{
 export const user = sqliteTable('auth_user', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  username: text('username').unique(),
   email: text('email').notNull().unique(),
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
   image: text('image'),
@@ -97,6 +98,22 @@ export const rateLimit = sqliteTable('auth_rate_limit', {
   count: integer('count').notNull(),
   lastRequest: integer('last_request').notNull(),
 });
+
+// Recovery credentials are generated at 256 bits and stored only as hashes.
+// A replacement hash also acts as the claim marker inside an atomic D1 batch.
+export const accountRecoveryKeys = sqliteTable('account_recovery_keys', {
+  userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  keyHash: text('key_hash').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+// Keys are keyed HMAC digests, never raw usernames, IP addresses or secrets.
+export const accountActionLimits = sqliteTable('account_action_limits', {
+  key: text('key').primaryKey(),
+  windowStart: integer('window_start').notNull(),
+  count: integer('count').notNull(),
+}, table => [index('account_action_limits_window_idx').on(table.windowStart)]);
 
 // Follow an account's public identity without exposing its authentication ID.
 // Keeping the last public identifier permits unfollowing an unpublished reader.

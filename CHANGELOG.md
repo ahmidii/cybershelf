@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.0-beta.1 — Username accounts and recovery keys — unreleased
+
+### Added
+
+- Username-and-password signup without collecting a real email address. A random internal identifier accommodates the existing authentication schema; account email callbacks never send to it.
+- A recovery key shown once after signup or replacement, with copy/download controls and an explicit saved-key acknowledgement. Recovery replaces the password and key, revokes sessions, and requires a new sign-in.
+- Existing email accounts retain their sign-in and recovery paths, and can claim a username after fresh authentication and current-password confirmation.
+- A public privacy explanation covering pseudonymous accounts, deliberately shared content, server-readable data, external image hosts, and beta limitations.
+
+### Hardened
+
+- New or changed passwords require at least 15 characters, with local checks for a small set of predictable choices. This is not a comprehensive breached-password database.
+- New password hashes use versioned native scrypt with fixed parameters and constant-time comparisons. Legacy hashes and existing shorter passwords remain compatible. Password derivation has a bounded queue.
+- Recovery and account-identity changes use durable attempt limits, same-origin checks, expected-account checks, and conditional database writes.
+- HTML responses reject framing; responses include no-referrer and nosniff headers. Sensitive account routes remain private and non-cacheable.
+
+### Release hold
+
+- The source candidate has not been deployed. Better Auth and its adapter remain at 1.7.8 pending the 1.7.16 security update. The existing seven-day dependency release-age policy blocked the update on 2026-11-09; it has not been disabled or bypassed. See [release status](docs/release-status.md).
+- Self-service account deletion, reporting/blocking, verified production restore procedures, and physical-device gesture testing remain outside this candidate.
+
 ## 0.7.0 — Pages, touch, and real spines — 2026-10-23
 
 ### Added

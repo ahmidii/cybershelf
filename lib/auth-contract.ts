@@ -1,6 +1,6 @@
 // Shared by the sign-in form and server. This module contains no credentials
 // or runtime bindings and is safe to import into browser components.
-export const AUTH_PASSWORD_MIN_LENGTH = 12;
+export const AUTH_PASSWORD_MIN_LENGTH = 15;
 export const AUTH_PASSWORD_MAX_LENGTH = 128;
 export const AUTH_NAME_MAX_LENGTH = 80;
 export const AUTH_EMAIL_MAX_LENGTH = 254;

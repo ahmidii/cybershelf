@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes version 0.5 as implemented. The app runs on Vinext/React with a Cloudflare Worker, a D1 database, and an R2 bucket. Better Auth supplies email/password authentication and database-backed sessions on the standalone Cloudflare deployment.
+This document describes the 0.8 source candidate. The app runs on Vinext/React with a Cloudflare Worker, a D1 database, and an R2 bucket. Better Auth supplies username/password authentication, legacy email login, and database-backed sessions on the standalone Cloudflare deployment. See [release status](release-status.md) before deploying the candidate.
 
 ## Product model
 
@@ -80,7 +80,7 @@ Application data is split between private state and deliberate public snapshots:
 | `book_ratings` | One explicit half-star community rating per owner/work, with deletion cascades. |
 | `book_reads` | Explicit completed-read dates, unique per owner/work/day and bounded per owner/work. |
 
-Better Auth additionally owns `auth_user`, `auth_session`, `auth_account`, `auth_verification`, and `auth_rate_limit`. Password hashes and session tokens stay server-side. The verification table is reserved for the maintained authentication schema; no email delivery or account-recovery flow is configured in this release.
+Better Auth additionally owns `auth_user`, `auth_session`, `auth_account`, `auth_verification`, and `auth_rate_limit`. Password hashes and session tokens stay server-side. Verification records support email confirmation and one-hour email-reset tokens. `account_recovery_keys` stores only digests of random recovery keys; `account_action_limits` holds bounded attempt counters keyed by HMAC digests rather than plaintext usernames/IP addresses. Usernames are nullable and unique, preserving existing email accounts during migration.
 
 The compact state record keeps the private application state simple and makes catalog backup straightforward. It has a 2 MB payload ceiling, 2,000-book ceiling, and 100-shelf ceiling. A larger-scale version may normalize records, but that migration must preserve IDs, exports, placements, and conflict behavior.
 
@@ -182,7 +182,11 @@ The complete backup uses ordinary, uncompressed ZIP entries so the file bytes re
 
 [`app/auth.ts`](../app/auth.ts) resolves a signed cookie through Better Auth and D1. The stable account ID is the ownership key. Cookies are HTTP-only, SameSite=Lax, and Secure on HTTPS. Sessions expire after 30 days and are checked against D1; the session cookie cache is disabled. Sign-out is a POST and revokes the session. The application never accepts `oai-authenticated-*` headers as proof of identity.
 
-[`lib/server/auth.ts`](../lib/server/auth.ts) configures an explicit `APP_ORIGIN`, a required random `BETTER_AUTH_SECRET`, maintained password hashing, and database-backed rate limits. Cloudflare’s `CF-Connecting-IP` supplies the rate-limit address; forwarding headers chosen by a caller do not establish identity. Accounts have unverified email addresses until an actual verification flow is added. Account linking is disabled. A missing auth configuration disables account sign-in while keeping guest browsing available.
+[`lib/server/auth.ts`](../lib/server/auth.ts) configures an explicit `APP_ORIGIN`, a required random `BETTER_AUTH_SECRET`, versioned native password hashing, and database-backed rate limits. Cloudflare’s `CF-Connecting-IP` supplies the rate-limit address; forwarding headers chosen by a caller do not establish identity. Email confirmation is optional for existing email accounts; username-only accounts collect no real address and suppress email callbacks. Account linking and email changes are disabled. A missing auth configuration disables account sign-in while keeping guest browsing available.
+
+[`lib/server/username-accounts.ts`](../lib/server/username-accounts.ts) reuses the complete Better Auth signup handler with a server-generated random internal address. No request header can opt into that trusted path. A username claim or replacement recovery key needs the current password, a recent session, same-origin POST, and the expected account ID. Final writes recheck the session and exact credential. Recovery claims the old key and password state in one D1 batch, conditions subsequent changes on a new random key digest, changes the password, deletes pending email-reset tokens, and revokes sessions. Concurrent/replayed recovery cannot reuse the claim. The successful response supplies a new recovery key but no new session.
+
+[`lib/server/passwords.ts`](../lib/server/passwords.ts) verifies both original Better Auth scrypt hashes and the new fixed versioned format. New credentials use `N=32768`, `r=8`, `p=3`, with one active derivation and at most eight waiters per module/isolate. Legacy credentials remain usable and are upgraded when changed or reset. New-password policy applies only at credential creation/change/reset, not when authenticating an existing password.
 
 Private mutation requests carry `X-Cybershelf-Account` as an identity precondition. The server compares it with the authenticated session; the header cannot grant access. This prevents an old tab from saving one reader’s library into another reader’s account after a cookie/session change. Optimistic library versions separately prevent concurrent overwrite within the same account.
 

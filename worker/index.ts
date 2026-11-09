@@ -26,14 +26,23 @@ const worker = {
     }
     const response = await runWithExecutionContext<Response>(ctx, () => runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx)));
     const pathname = new URL(request.url).pathname.replace(/\/+$/, '');
-    if (['/connect/hardcover', '/signin', '/account', '/forgot-password', '/reset-password'].includes(pathname) || pathname.startsWith('/api/auth/')) {
-      const headers = new Headers(response.headers);
+    const headers = new Headers(response.headers);
+    // Public artwork may live on another host. Avoid sending the reader's
+    // current page URL along with those image requests.
+    headers.set('Referrer-Policy', 'no-referrer');
+    headers.set('X-Content-Type-Options', 'nosniff');
+    if (headers.get('Content-Type')?.includes('text/html')) {
+      // The app has no embedded-account flow. Prevent a third-party frame from
+      // disguising account, publication, or library controls as another page.
+      headers.set('X-Frame-Options', 'DENY');
+      headers.append('Content-Security-Policy', "frame-ancestors 'none'");
+    }
+    if (['/connect/hardcover', '/signin', '/account', '/forgot-password', '/reset-password'].includes(pathname) || pathname.startsWith('/api/auth/') || pathname.startsWith('/api/account/')) {
       headers.set('Referrer-Policy', 'no-referrer');
       headers.set('Cache-Control', 'private, no-store');
       headers.set('X-Robots-Tag', 'noindex, nofollow');
-      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     }
-    return response;
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   },
 };
 

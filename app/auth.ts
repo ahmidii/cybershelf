@@ -4,11 +4,13 @@ import { redirect } from 'next/navigation';
 import { signInPath } from '../lib/auth-contract';
 import { AuthConfigurationError, authConfiguration, createAuth } from '../lib/server/auth';
 import { authEmailConfiguration } from '../lib/server/auth-email';
+import { genuineAccountEmail } from '../lib/account-identity';
 
 export type CurrentUser = {
   userId: string;
   displayName: string;
-  email: string;
+  email: string | null;
+  username: string | null;
   fullName: string | null;
   emailVerified: boolean;
 };
@@ -30,8 +32,9 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!session) return null;
   return {
     userId: session.user.id,
-    displayName: session.user.name || session.user.email,
-    email: session.user.email,
+    displayName: session.user.name || session.user.username || 'Reader',
+    email: genuineAccountEmail(session.user.email),
+    username: session.user.username ?? null,
     fullName: session.user.name || null,
     emailVerified: session.user.emailVerified,
   };

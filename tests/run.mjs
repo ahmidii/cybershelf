@@ -11,6 +11,8 @@ const runtime = resolve(root, '.sites-runtime');
 mkdirSync(runtime, { recursive: true });
 const scratch = mkdtempSync(resolve(runtime, 'regression-'));
 const files = [
+  'lib/auth-contract.ts', 'lib/server/passwords.ts', 'tests/passwords.test.ts',
+  'lib/account-identity.ts', 'lib/server/recovery-keys.ts', 'tests/account-identity.test.ts', 'tests/recovery-keys.test.ts',
   'lib/types.ts', 'lib/demo.ts', 'lib/arrange.ts', 'lib/import.ts', 'lib/export.ts', 'lib/book-catalog.ts', 'lib/book-community.ts',
   'lib/book-size.ts', 'lib/shelf-geometry.ts', 'lib/shelf-placement.ts', 'lib/shelf-actions.ts', 'lib/reading.ts', 'lib/reading-progress.ts', 'lib/reading-view.ts', 'lib/reading-log.ts', 'lib/spine-image.ts', 'lib/connections.ts', 'lib/connections/hardcover.ts',
   'tests/import.test.ts', 'tests/arrange.test.ts', 'tests/book-size.test.ts', 'tests/shelf-geometry.test.ts', 'tests/shelf-actions.test.ts', 'tests/reading.test.ts', 'tests/reading-progress.test.ts', 'tests/reading-view.test.ts', 'tests/reading-log.test.ts', 'tests/spine-image.test.ts', 'tests/connections.test.ts', 'tests/hardcover.test.ts', 'tests/book-community.test.ts',
@@ -35,6 +37,9 @@ try {
     // Report actual cases consistently in managed runtimes where child-process
     // test reporting may otherwise collapse each module into a single result.
     '--experimental-test-isolation=none',
+    resolve(scratch, 'tests/passwords.test.mjs'),
+    resolve(scratch, 'tests/account-identity.test.mjs'),
+    resolve(scratch, 'tests/recovery-keys.test.mjs'),
     resolve(scratch, 'tests/import.test.mjs'),
     resolve(scratch, 'tests/arrange.test.mjs'),
     resolve(scratch, 'tests/book-size.test.mjs'),
@@ -54,8 +59,10 @@ try {
     resolve(root, 'lib/server/auth.test.mjs'),
     resolve(root, 'tests/deployment-auth.test.mjs'),
     resolve(root, 'tests/browser-draft.test.mjs'),
+    resolve(root, 'tests/account-ui.test.mjs'),
   ], { cwd: root, stdio: 'inherit' });
   if (result.error) throw result.error;
+  if (result.signal) throw new Error(`The regression process was interrupted by ${result.signal}; no complete verification result was accepted.`);
   if (result.status === 0) {
     // A clean process exit alone must not approve an incomplete async test run.
     const report = readFileSync(resolve(scratch, 'completion.tap'), 'utf8');
