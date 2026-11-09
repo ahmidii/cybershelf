@@ -2,8 +2,18 @@ import handler from "vinext/server/fetch-handler";
 import { runWithExecutionContext } from "vinext/shims/request-context";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
+import { runHousekeeping } from '../lib/server/maintenance';
+import { backupOriginalAssets } from '../lib/server/original-backups';
 
 const worker = {
+  async scheduled(event: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
+    if (env.MAINTENANCE_ENABLED !== 'true') return;
+    if (event.cron === '*/5 * * * *') ctx.waitUntil(runHousekeeping(env));
+    else if (event.cron === '2-59/5 * * * *') ctx.waitUntil((async () => {
+      const result = await backupOriginalAssets(env);
+      if (result.status === 'failed') throw new Error('Cybershelf original backup needs retry.');
+    })());
+  },
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and
@@ -37,7 +47,7 @@ const worker = {
       headers.set('X-Frame-Options', 'DENY');
       headers.append('Content-Security-Policy', "frame-ancestors 'none'");
     }
-    if (['/connect/hardcover', '/signin', '/account', '/forgot-password', '/reset-password'].includes(pathname) || pathname.startsWith('/api/auth/') || pathname.startsWith('/api/account/')) {
+    if (['/connect/hardcover', '/signin', '/account', '/forgot-password', '/reset-password', '/safety', '/moderation', '/api/reports', '/api/blocks'].includes(pathname) || ['/api/auth/', '/api/account/', '/api/safety/', '/api/moderation/', '/api/operations/', '/api/blocks/'].some(prefix => pathname.startsWith(prefix))) {
       headers.set('Referrer-Policy', 'no-referrer');
       headers.set('Cache-Control', 'private, no-store');
       headers.set('X-Robots-Tag', 'noindex, nofollow');

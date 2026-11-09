@@ -82,6 +82,13 @@
 .document strong { color: #42533b; font-weight: 600; }
 .footer { display: flex; justify-content: space-between; gap: 20px; max-width: 1240px; width: 100%; margin: 0 auto; border-top: 1px solid var(--line); padding: 21px 0 25px; color: #6c7563; font-size: 10px; line-height: 1.6; }
 .spinner { animation: accountTurn 1s linear infinite; }
+.deletionCard { border-color: #dfd2c8; }
+.deletionCard .keyWarning p + p { margin-top: 9px; }
+.deletionCard .keyWarning a { text-decoration: underline; text-underline-offset: 3px; }
+.deletionCard .error { margin-top: 18px; }
+.dangerButton { color: #84503e; border-color: #dec8bd; background: #f8f0e9; }
+.deleteSubmit { background: #87513e; border-color: #87513e; }
+.deleteSubmit:hover:not(:disabled) { background: #70412f; }
 @keyframes accountTurn { to { transform: rotate(360deg); } }
 
 @media (max-width: 700px) {

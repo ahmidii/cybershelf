@@ -1,6 +1,6 @@
 {
   "name": "cybershelf",
-  "version": "0.8.0-beta.1",
+  "version": "0.8.0",
   "private": true,
   "license": "MIT",
   "description": "A home for your books: collect a library, compose expressive shelves, and keep a reading journal.",
@@ -29,14 +29,15 @@
     "db:migrate:local": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 migrations apply DB --local --config wrangler.jsonc --persist-to .wrangler/state",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc",
     "test:integration": "node --test lib/server/integration.test.mjs",
-    "test:worker": "node tests/worker-integration.mjs"
+    "test:worker": "node tests/worker-integration.mjs",
+    "ops:verify": "node scripts/verify-cloudflare-operations.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
-    "@better-auth/drizzle-adapter": "1.7.8",
+    "@better-auth/drizzle-adapter": "1.7.16",
     "@hookform/resolvers": "^5.7.1",
     "@shadcn/react": "^0.3.0",
-    "better-auth": "1.7.8",
+    "better-auth": "1.7.16",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "^1.1.1",

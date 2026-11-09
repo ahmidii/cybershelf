@@ -1,57 +1,88 @@
-# Beta readiness assessment
+# Public-beta readiness assessment
 
-Assessed 2026-11-09 against deployed source `3f8614061dc21a58cf57a4b39d957814cf65d68d` (0.7.0) and the local 0.8.0-beta.1 candidate. This is a source review and automated integration assessment, not an independent penetration test or a security guarantee.
+Updated 2026-11-09 for the local **0.8.0 candidate**. This document separates implemented controls, candidate verification, and evidence about the live installation. It is a source assessment, not an independent penetration test or a security guarantee.
 
 ## Decision
 
-A small, personally invited and closely supported beta is the appropriate next stage after the authentication dependency update is installed and the resulting build passes verification. General public promotion should wait for the account lifecycle, abuse, and operational gaps below. Registration is currently open: inviting a small group is a rollout choice, not a technical invitation gate.
+The requested account deletion, reporting/blocking, moderation workflow, and atomic upload reservations are implemented in this candidate. Better Auth and its adapter have been updated to 1.7.16 using the maintainer-approved exact-version release-age exceptions. The seven-day policy remains enabled for other dependency releases.
 
-The 0.8 candidate is not live. Its username and recovery-key implementation is prepared separately from the deployed 0.7 account flow. See [release status](release-status.md) for accepted test results and the release hold.
+**The expanded candidate is not yet signed off for a broad public beta.** Its expanded build, 201 regression cases, and local recovery checks have passed. The built-Worker acceptance record and production deployment must be checked against this release commit; production gates below remain separate from local verification. See [release status](release-status.md) for the current record.
 
-## What is already protected
+The intended next step is to finish verification, deploy the reviewed candidate through the existing Worker, complete the operational checks with synthetic data, and then invite a supported beta cohort. Wider promotion should follow recorded evidence. Registration is open unless the operator adds an access restriction; inviting a small group is a rollout decision, not a technical invitation gate.
 
-- Passwords are stored as salted password hashes, never recoverable plaintext. Existing 0.7 hashes remain valid in the candidate. New or reset passwords use versioned scrypt with `N=32768`, `r=8`, `p=3`, a random 16-byte salt, and constant-time comparison. This is one of OWASP's listed scrypt configurations. Existing hashes upgrade when their password is changed or reset, not automatically at login.
-- Session cookies use HTTPS Secure, HttpOnly, and SameSite settings. Sessions are backed by D1; unsigned cookies and caller-supplied identity headers do not authenticate a request.
-- Authentication uses an explicit trusted origin, durable rate limits, current-password checks for sensitive changes, and session revocation after recovery. A stale browser tab cannot silently mutate a different signed-in account.
-- Private API and file access are owner-scoped. Published shelves and reading updates are explicit public representations, not direct exposure of a private library. Original EPUB/PDF files are not served by public image routes.
-- Recovery keys contain 256 random bits. Only their digest is stored, and successful recovery replaces the key and revokes existing sessions. Keys are not sent through email, placed in URLs, or saved into browser storage by the app.
-- The candidate adds anti-framing headers on HTML, a no-referrer policy, and nosniff. This is not a complete script-restricting Content Security Policy.
+## Implemented account and privacy boundaries
 
-References: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [OWASP authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), and the production implementations in `lib/server/auth.ts`, `lib/server/passwords.ts`, `lib/server/username-accounts.ts`, and `worker/index.ts`.
+- Passwords are salted hashes. New or changed passwords use versioned native scrypt with fixed parameters, random salts, constant-time comparisons, and a bounded derivation queue. Existing hashes and shorter legacy passwords remain usable until changed. Predictability checks are limited and do not constitute a complete breached-password database.
+- Sessions are database-backed. HTTPS cookies use Secure, HttpOnly, and SameSite attributes. Caller-supplied identity headers cannot authenticate a request; the expected-account header prevents a stale tab from mutating a different signed-in account.
+- Sensitive account operations require the current password and a recent sign-in. Recovery replaces the credential and recovery key, revokes sessions, and invalidates pending email-reset credentials. Durable attempt limits and conditional writes protect competing requests.
+- Recovery keys contain 256 random bits and are stored only as digests. The usable key is shown when created or replaced. The app does not place it in a URL, email it, or include it in a library export.
+- Private library and file routes enforce ownership. Public shelves/profiles/reading updates use deliberately published snapshots. Original EPUB/PDF files never become public image assets.
+- HTML rejects framing, and sensitive responses use no-store, no-referrer, and nosniff controls. This does not provide a complete script-restricting Content Security Policy or a guarantee against every browser attack.
 
-## Authentication dependency hold
+The implementation sources are [authentication](../lib/server/auth.ts), [passwords](../lib/server/passwords.ts), [username accounts](../lib/server/username-accounts.ts), and [account deletion](../lib/server/account-deletion.ts). Final execution against the updated dependency tree is required before release.
 
-The installed Better Auth and Drizzle adapter are pinned to 1.7.8. Better Auth's [2026-11-03 security release](https://better-auth.com/blog/security-release-2026-11-03) identifies stable 1.7.16 as the patched release and directs users to update its packages together.
+## Requested beta controls
 
-Several published attack conditions concern plugins or configurations that Cybershelf does not enable, including mobile/desktop integrations, phone or email OTP, organization/admin/Stripe plugins, OAuth sign-in, MySQL serial identifiers, and secondary session storage. A version difference alone is not proof that this deployment is exploitable. It is nevertheless prudent to update before inviting new users.
-
-The update failed with `ERR_PNPM_NO_MATURE_MATCHING_VERSION` because `pnpm-workspace.yaml` requires releases to age seven days. No exception was applied. The latest currently blocked transitive release reaches seven days around 2026-11-10 21:25 UTC. The safe options are to wait for those versions to mature, or obtain approval for exact-version exceptions covering only the reviewed security patch and its required packages, then install and rerun verification. A source candidate tested against 1.7.8 does not count as verification of 1.7.16.
-
-## What “no email required” means
-
-New readers choose a username and password. They do not have to provide a real name, email address, or retailer login. The authentication schema retains a random, non-deliverable internal address, which is not an actual contact address and is not presented as one in the interface. Existing email accounts retain their email until a separate, deliberate account-data change is implemented.
-
-This provides pseudonymity. Cybershelf and its hosting infrastructure still process account identifiers, sessions, network information, libraries, and shared activity. Stored library data is protected by authorization, not end-to-end encryption. A reused username, uploaded photo, or public reading post may identify its author. External cover and decoration hosts receive requests from the reader's browser.
-
-For a username account, losing both the password and recovery key means there is no supported account-recovery path. Do not promise recovery through screenshots, public profile details, or a support conversation: those do not prove ownership. Save the key privately. After using or replacing it, save the new key because the old one no longer works.
-
-## Gaps before a broad public beta
-
-| Area | Current limit | Needed next step |
+| Area | Implemented in this candidate | Evidence still required before widening |
 | --- | --- | --- |
-| Account deletion | No complete self-service deletion flow. Removing an auth row alone would leave related data or uploads behind. | Fresh-auth deletion with coordinated D1 cleanup, revocation of public content, and retryable R2 removal. |
-| Abuse response | No reader blocking/reporting or operator moderation workflow. Reply authors and conversation owners have limited removal controls. | Add reporting, blocking, accountable moderation actions, and a private support/reporting contact. |
-| Upload cost controls | Per-account size/count limits exist, but the quota check and upload are separate operations. Concurrent uploads can race the check. | Reserve quota atomically and add durable upload limits before large-scale open registration. |
-| Image privacy | Ordinary uploaded images may retain source metadata. External image hosts receive the visitor's network address. Cropped spine exports are re-encoded. | Strip sensitive image metadata consistently and evaluate an image proxy with clear limits. |
-| Recovery and retention | Recovery keys and email recovery work in their supported paths, but a complete retention/deletion policy and operator procedure are not established. | Define what is retained, how support verifies ownership, and how deletion is completed. |
-| Production operations | Source cannot prove administrator MFA, current Cloudflare backup/restore settings, bucket exposure, alerting, or spending controls. | Verify settings and perform a restore drill for both D1 metadata and R2 originals before relying on backups. |
-| Password defenses | No passkeys/MFA or full compromised-password screening. Local predictability checks have limited coverage. | Consider passkeys and comprehensive screening after the basic beta is stable. |
-| Device testing | Automated tests exercise application behavior but do not replace physical iPhone/iPad testing. | Test signup/recovery, keyboard interaction, gestures, and spine-photo cropping on real devices. |
+| Account deletion | A fresh-session/current-password flow removes auth and associated live D1 records atomically, revokes public routes, queues original/artwork erasure, and retries storage failures. A minimal erasure ledger supports recovery reconciliation. | Passing final integration checks; live maintenance running; observed synthetic cleanup and backlog monitoring. |
+| Reporting and blocking | Canonical public targets, bounded reports, durable attempt/duplicate controls, reciprocal blocks, and server-side feed/conversation/image filtering. | Real moderator account IDs configured, review coverage assigned, private support contact published, and an ordinary-account access-denial check. |
+| Moderation | An immutable-ID allowlist, recent-sign-in actions, recorded decisions, public hide/restore, and participation suspension/restore. Suspended users retain private export, security, and deletion. | A responsible person can access the deployed queue and understands escalation, restoration, and data handling. The queue is not a staffed service by itself. |
+| Upload limits | A single D1 reservation protects byte/count/in-flight limits. Finalization rechecks account state; pending cleanup counts toward quota. Conditional writes and cancellation barriers address unfinished uploads. | Passing concurrency/failure tests and observed production retry behavior. Older requests must drain at rollout; historical untracked objects are not retroactively reconciled by this protocol. |
+| Production operations | Read-only audit tooling, bounded maintenance, optional private original-file backup support, status reporting, and an erasure-aware restore runbook. | Actual administrator/MFA review, private primary/backup buckets, Time Travel coverage, a completed file backup, an isolated Cloudflare restore exercise, and delivered alerts. |
 
-These are observed implementation or verification limits. A Cloudflare setting that is not visible in source may already be configured; it must be checked before making a claim either way.
+The [moderation guide](moderation.md), [upload protocol](upload-storage.md), [production runbook](production-operations.md), and [original-file backup guide](original-backups.md) describe the exact behavior and setup.
 
-## Operational handoff
+## Production evidence is still pending
 
-Keep the existing authentication secret and resource identifiers. Do not recreate D1/R2 or rotate a working secret solely because a dependency version changed. Apply only the additive migration through the existing deploy script after the candidate is approved for release. Review authentication latency and Worker CPU-limit metrics under expected beta load: local native-scrypt timings are not a measurement of the production plan's billed CPU budget.
+The attempted Cloudflare dashboard sign-in returned HTTP 403. That result did not establish administrator security, bucket exposure, current retention, or alert configuration. An unavailable setting is **unverified**, not automatically insecure. Existing authorized read-only tools can collect additional evidence without broadening credentials or exposing private records.
 
-Start with a small known group, explain recovery-key responsibility and explicit sharing, collect reproducible bugs without requesting passwords or recovery keys, and expand only after the remaining lifecycle and operational controls are in place.
+Record these checks before a broad public invitation:
+
+1. Require administrator MFA and review account members, repository/deploy access, recovery access, and token scopes.
+2. Confirm the primary file bucket and separate backup bucket both have managed public access and custom domains disabled.
+3. Verify the intended D1 database, a usable Time Travel bookmark, and the actual plan's recovery window. Do not infer 30-day coverage from a working API call.
+4. Configure the private backup destination and retention policy; confirm a full successful scan. A binding or recent partial scan is insufficient.
+5. Rehearse restoration in isolated resources with synthetic originals and current security/erasure reconciliation. Verify bytes and owner isolation before describing the backup as tested.
+6. Verify deployed maintenance schedules and recent successful runs. Assign an operator to failed erasure jobs, stale backups, provider errors, and spending thresholds.
+7. Configure an external alert destination and confirm receipt of a controlled synthetic failure. The application does not infer delivery from logging configuration.
+8. Configure `MODERATOR_USER_IDS` from verified Cybershelf account IDs copied at `/safety`. There is no first-user bootstrap and no username/email-based promotion.
+
+A normal health response reports account/email configuration readiness. The optional operations health response reports limited capability/freshness booleans. Neither response certifies administrator MFA, delivered email/alerts, or a successful production restore.
+
+## What no required email means
+
+A new reader chooses a username and password without providing a real name, email address, or retailer login. The authentication schema uses a random non-deliverable internal address where its adapter requires one; it is not a contact address. Existing email accounts retain their existing email sign-in and configured recovery paths. Adding or removing email is not part of this release.
+
+This provides **pseudonymity, not complete anonymity**. The service and hosting infrastructure process account identifiers, sessions, network information, libraries, and shared activity. Private stored data is protected by authorization and remains readable by the service operator; it is not end-to-end encrypted. Reused names, uploaded images, and public posts can identify a reader. External artwork hosts receive requests from readers' browsers.
+
+For an account without email, losing both the password and recovery key leaves no supported recovery path. Screenshots, public profile details, and a support conversation do not prove ownership. Never request a password or recovery key in a public issue or support message.
+
+## Deletion, recovery copies, and restoration
+
+Deletion acceptance removes live access and associated records together. Uploaded originals and artwork may take longer to erase during a storage outage; the durable job continues without the user staying on the page. Unknown in-flight writes are sealed with empty, metadata-free cancellation objects. Those markers have no usable book/image bytes or live account mapping. Do not remove them using the backup bucket's expiry policy.
+
+Reports, captured excerpts, and linked audit text are erased when their reporter or target account is deleted. They otherwise have no automatic application retention deadline in this release. Shared book titles/authors are ownerless bibliographic records and can remain. Other people's saved copies cannot be recalled.
+
+The operator recovery policy limits private recovery copies, SQL exports, and incident copies to **30 days**. Storage expiration can finish after the configured date; the policy is not a claim of exact-second physical erasure. The private erasure ledger holds only an opaque former account ID and request/expiry timestamps for **35 days**. Its window must exceed the actual surviving backup history. Delayed lifecycle expiration or longer incident retention requires coordinated action before an older restore can be promoted.
+
+Before any restore, preserve the latest trusted account credentials/recovery-key state and the current erasure ledger outside the database being replaced. Apply current deletions and moderation restrictions, revoke restored sessions/reset tokens, and honor publication withdrawals before serving traffic or restoring file access. An old backup's own ledger can predate a deletion; old credentials can re-enable a changed password or consumed recovery key. If trustworthy current security/erasure evidence is unavailable, keep the restored service closed until the recovery plan is resolved.
+
+The periodic file copier is separate from D1 recovery and can lag new uploads by the scan interval plus processing delays. Complete-scan freshness does not make database records and file bytes an atomic snapshot. Reconcile the retained asset manifest and verify each needed original during recovery. A local synthetic drill verifies code paths; it does not prove that live backups exist or that a Cloudflare restore has succeeded.
+
+## Remaining product limits
+
+| Area | Current boundary |
+| --- | --- |
+| Image privacy | Ordinary uploads can retain camera/location metadata; cropped spine exports are re-encoded. External cover/spine/decoration hosts receive browser requests. |
+| Blocking and spoilers | Public content remains public while signed out. Spoiler controls follow declared markers, not semantic analysis of text. |
+| Authentication choices | No user passkeys or app MFA, and no comprehensive compromised-password screening. Administrator MFA is a separate operator requirement. |
+| Moderation communications | No automatic decision email, block notification, or staffed appeals service is provided. Operators need an appropriate private contact. |
+| Device verification | Automated checks do not establish physical iPhone/iPad gesture, camera, password-manager, or assistive-technology behavior. These need representative device checks. |
+| Backup scope | Reader JSON/CSV/ZIP exports do not recreate all social records or serving permissions. Periodic operator originals are recovery copies, not a file-version history or independent protection against total Cloudflare-account compromise. |
+
+## Rollout handoff
+
+Preserve the existing authentication secret and production resource identities. Apply the additive migrations through the existing reviewed deployment path, and retain the general dependency-aging policy with only the approved exact-version exceptions. Record the actual deployed commit, final test results, migration outcome, and operational checks in [release status](release-status.md).
+
+Start with readers who understand recovery keys and explicit sharing, monitor authentication resource usage and cleanup/backup backlog, and collect reproducible bugs without private credentials or book files. Expand when the evidence supports it, rather than treating a successful build as the final beta-readiness gate.

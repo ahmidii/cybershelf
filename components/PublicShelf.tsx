@@ -1,5 +1,6 @@
 'use client';
 
+import SafetyActions from './SafetyActions';
 import { useEffect, useRef, useState } from 'react';
 import ShelfCanvas from './ShelfCanvas';
 import BrandMark from './BrandMark';
@@ -120,7 +121,7 @@ export default function PublicShelf({id}:{id:string}) {
       </section>:publication?<>
         <section className={styles.intro}>
           <span className={styles.eyebrow}><span className={styles.ownerDot} aria-hidden="true"/> ON {publication.name.toLocaleUpperCase()}’S SHELF</span>
-          <h1>{publication.shelf.title}</h1>{publication.profileId&&<a className={styles.ownerLink} href={'/u/'+publication.profileId}>Visit {publication.name}’s profile <span aria-hidden="true">↗</span></a>}
+          <h1>{publication.shelf.title}</h1><SafetyActions kind="shelf" targetId={publication.id}/>{publication.profileId&&<a className={styles.ownerLink} href={'/u/'+publication.profileId}>Visit {publication.name}’s profile <span aria-hidden="true">↗</span></a>}
           {publication.shelf.description?<p className={styles.description}>{publication.shelf.description}</p>:null}
           <div className={styles.meta}><span>{publication.bookCount} {publication.bookCount===1?'BOOK':'BOOKS'}</span><span aria-hidden="true">/</span><span>A LITTLE WORLD, SHARED</span></div>
         </section>

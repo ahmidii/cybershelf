@@ -39,7 +39,7 @@ Cloudflare installs dependencies before the build. The committed package-manager
 
 The current configuration points at the production database. Enable automatic deployment for `main`; do not configure branch previews against these same production bindings. A separate preview environment needs its own database, bucket, secret, origin, and deployment configuration.
 
-The build writes `dist/server/wrangler.json` and the client assets. The deploy command first applies pending SQL migrations from `drizzle/`, then deploys that built configuration. A failed migration stops deployment. Wrangler tracks successful migrations, so retrying a failed build does not blindly rerun all SQL.
+The build writes `dist/server/wrangler.json` and the client assets. The deploy command first provisions/verifies the separate private backup bucket and expiry policy, applies pending SQL migrations from `drizzle/`, then deploys that built configuration. A failed migration stops deployment. Wrangler tracks successful migrations, so retrying a failed build does not blindly rerun all SQL.
 
 Reference: [Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/) and [build image settings](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/).
 
@@ -101,7 +101,7 @@ Reference: [Worker Custom Domains](https://developers.cloudflare.com/workers/con
 
 Open the custom domain, create an account, add a book and a shelf, and reload to confirm they persist. Upload a small EPUB/PDF and retrieve it through **Grab this book**. Sign out and sign back in. Publish a shelf and open its share link in a signed-out window; that link should show the chosen shelf without private notes, source links, or book originals.
 
-If a private API reports a database error, check that all eight committed migrations completed successfully. If authentication is unavailable, check the runtime secret and exact origin. If requests fail with a Worker CPU-limit error, inspect Cloudflare's invocation metrics and plan limits. The Free plan has a small per-request CPU allowance; a local test does not establish that a complete production auth request fits it. Cybershelf uses native scrypt on Workers, with a bounded derivation queue and stronger parameters for new passwords, without reducing password-hash strength to meet a plan limit.
+If a private API reports a database error, check that all nine committed migrations completed successfully. If authentication is unavailable, check the runtime secret and exact origin. If requests fail with a Worker CPU-limit error, inspect Cloudflare's invocation metrics and plan limits. The Free plan has a small per-request CPU allowance; a local test does not establish that a complete production auth request fits it. Cybershelf uses native scrypt on Workers, with a bounded derivation queue and stronger parameters for new passwords, without reducing password-hash strength to meet a plan limit.
 
 Reference: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 
@@ -135,7 +135,7 @@ The 0.8 candidate supports username/password signup without an external email se
 
 The account page supports password changes and signing out other devices. Password changes require the current password and revoke other sessions; an older session can sign in again through the explicit reauthentication flow. Recovery with a key changes the password, replaces the key, removes outstanding email-reset tokens, and revokes all sessions without automatically signing in. Automatic account linking and email-address changes remain disabled. An account without email has no supported recovery route if both its password and recovery key are lost. Do not improvise ownership verification through public profile information.
 
-The [release status](release-status.md) records the pending authentication dependency update. Do not treat a successful local candidate build as approval to deploy before that hold is resolved.
+The 0.8.0 release pins Better Auth and its Drizzle adapter to 1.7.16. The owner approved exact-version exceptions to the seven-day dependency age policy for this security update; the default aging policy remains enabled. See the [release status](release-status.md) for validation and deployment evidence.
 
 **Production email remains an owner activation step.** Until the provider settings above are present, the interface says verification/recovery are unavailable. Do not advertise delivered recovery email until your own inbox test passes. Browser-draft imports preserve the account name, and failed library saves offer an export or explicit discard before signout.
 
@@ -169,3 +169,17 @@ The original `.openai/hosting.json` is retained for development history. The sta
 ## Optional book account connections
 
 Version 0.4 includes a browser-only Hardcover connector. Enable it once for your installation with a public OAuth application ID in the Worker runtime. No client secret, additional database, or background worker is needed. Follow [the account connection setup guide](account-connections.md#activate-hardcover-on-your-installation) for the exact callback, scopes, and `HARDCOVER_CLIENT_ID` setting. This is separate from Cybershelf’s own email/password sign-in and from a Cloudflare deployment API token.
+
+## Public beta operations
+
+The 0.8 deployment provisions a separate private `cybershelf-backups` R2 bucket bound as `BACKUP_BUCKET`, verifies that its public access is disabled, and installs a 30-day object-expiry rule before applying migrations or publishing. The build token must have R2 bucket management permission in the selected account. Unexpected exposure, conflicting retention rules, ambiguous accounts, or missing permissions stop deployment with a fixed diagnostic; the old Worker remains available. Do not add an expiry rule to the primary `cybershelf-files` bucket, whose zero-byte cancellation markers prevent late uploads from recreating deleted bytes.
+
+`MAINTENANCE_ENABLED=true` and two Cron Triggers are source controlled: cleanup every five minutes, original-file backup batches every five minutes offset by two minutes. Cleanup drains durable account/file deletion jobs. Backups stream bounded batches to the separate bucket and report success only after completing a scan. Verify actual production coverage and a private restore rehearsal; neither a binding nor a passing unit test proves a recoverable live backup. See [original-file backups](original-backups.md) for recovery window and capacity limits.
+
+To activate moderation, sign into your own Cybershelf account, open `/safety`, and copy your immutable account ID. Add it as the encrypted runtime secret `MODERATOR_USER_IDS` in the Worker's Variables and Secrets. Use comma-separated immutable IDs for additional explicitly selected moderators. Never substitute a public username, email address, GitHub identity, or the first database account. Deploy the secret, sign in again, and verify `/moderation` with that account. Assign a person to review reports; configuring an allowlist alone does not provide moderation coverage. See the [moderation runbook](moderation.md).
+
+`/api/health` keeps its existing account/email capability contract. `/api/health?check=operations` adds coarse moderation, cleanup, and backup health flags without revealing readers, queue contents, filenames, keys, or credentials. The post-deploy metadata audit records which Cloudflare controls it actually verified and leaves denied/untested checks unknown. Run `pnpm run ops:verify -- --report-only` for a read-only report in an authenticated operator environment; it never restores production data or modifies administrator settings.
+
+The repository includes **Production health**, a credential-free GitHub Actions check every 15 minutes. Enable Actions and failed-workflow notifications for your account, run its `simulate_failure` delivery drill, and confirm receipt. No notification address is inferred or configured by the application. Scheduled Actions can be delayed or disabled, so use a separately configured uptime monitor for stronger on-call needs. The check is deliberately limited to this repository's production domain; a fork must set its own destination and repository guard.
+
+Before wider invitations, complete the [production operations and restore runbook](production-operations.md), including Cloudflare MFA/admin/token review, both R2 access paths, actual D1 Time Travel retention, original-file recovery, delivered alerts, and controlled retirement of old upload requests. These are production evidence requirements, separate from local automated tests.

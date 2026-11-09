@@ -7,6 +7,8 @@ import { AUTH_USERNAME_MAX_LENGTH, AUTH_USERNAME_MIN_LENGTH, normalizeUsername, 
 import AccountFrame from './AccountFrame';
 import AccountPasswordField from './AccountPasswordField';
 import RecoveryKeyPanel from './RecoveryKeyPanel';
+import AccountDeletionPanel from './AccountDeletionPanel';
+import FileStorage from './FileStorage';
 import styles from './Account.module.css';
 
 type User = { userId: string; displayName: string; username: string | null; email: string | null; emailVerified: boolean };
@@ -22,7 +24,8 @@ export default function AccountSettings({ user, emailAvailable, verificationErro
   const [newPassword, setNewPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [issuedKey, setIssuedKey] = useState<{ value: string; username: string } | null>(null);
-  const [busy, setBusy] = useState<Action | null>(null);
+  const [busy, setBusy] = useState<Action | 'delete' | null>(null);
+  const [deleted, setDeleted] = useState<{ filesPending: boolean } | null>(null);
   const [error, setError] = useState(verificationError ? 'That verification link has expired or could not be used. Request a new link below to confirm your email.' : '');
   const [notice, setNotice] = useState('');
   const [recoveryAction, setRecoveryAction] = useState<'reload' | 'signin' | null>(null);
@@ -52,7 +55,7 @@ export default function AccountSettings({ user, emailAvailable, verificationErro
   }
 
   async function request(action: Action) {
-    if (requestRef.current || accountChanged || issuedKey) return;
+    if (requestRef.current || accountChanged || issuedKey || busy === 'delete') return;
     if ((action === 'verification' && !user.email) || (action === 'key' && !accountUsername) || (action === 'username' && accountUsername)) return;
     setError('');
     setNotice('');
@@ -147,6 +150,17 @@ export default function AccountSettings({ user, emailAvailable, verificationErro
     void request(action);
   }
 
+  if (deleted) return <AccountFrame wide>
+    <section className={styles.card}>
+      <div className={styles.icon}><Check size={22} aria-hidden="true"/></div>
+      <h1>Your account has been deleted.</h1>
+      <p className={styles.description}>Your sign-in, library, journal, and public account content have been removed. You have been signed out on every device.</p>
+      {deleted.filesPending ? <p className={styles.notice}>Your uploaded files are no longer accessible. Their removal from storage is queued and will continue automatically; you do not need to stay on this page.</p> : <p className={styles.notice}>Your uploaded file contents have also been removed from active storage.</p>}
+      <p className={styles.hint}>Downloaded copies and browser guest drafts are separate. Historical backups expire according to the backup retention policy; erased accounts must be excluded from any restore.</p>
+      <a className={styles.textLink} href="/">Return to cybershelf<ArrowRight size={15} aria-hidden="true"/></a>
+    </section>
+  </AccountFrame>;
+
   return <AccountFrame wide>
     <div className={styles.intro}>
       <p className={styles.eyebrow}>YOUR LITTLE CORNER</p>
@@ -238,6 +252,15 @@ export default function AccountSettings({ user, emailAvailable, verificationErro
           <p className={styles.description}>Used a shared computer, or want a fresh start elsewhere? Sign out everywhere except this browser.</p>
           <button type="button" className={`${styles.secondary} ${styles.full}`} disabled={!!busy || accountChanged} onClick={() => void request('devices')}>{busy === 'devices' ? <><LoaderCircle size={16} className={styles.spinner} aria-hidden="true"/>Signing out other devices…</> : <><ShieldCheck size={16} aria-hidden="true"/>Sign out other devices</>}</button>
         </section>
+        <section className={styles.card} aria-labelledby="account-safety-heading">
+          <div className={styles.sectionHeading}><ShieldCheck size={20} aria-hidden="true"/><h2 id="account-safety-heading">Your reading circle</h2></div>
+          <p className={styles.description}>Manage blocked readers and find the community safety tools.</p>
+          <a className={styles.textLink} href="/safety">Safety &amp; blocked readers<ArrowRight size={15} aria-hidden="true"/></a>
+        </section>
+        <FileStorage accountId={user.userId} disabled={!!busy || accountChanged}/>
+        <AccountDeletionPanel accountId={user.userId} identity={accountUsername || user.email || user.displayName} disabled={!!busy || accountChanged}
+          onBusyChange={active => setBusy(active ? 'delete' : null)}
+          onDeleted={filesPending => { clearPasswords(); setIssuedKey(null); setChosenUsername(''); setError(''); setNotice(''); setDeleted({ filesPending }); }}/>
       </div>
     </div>}
     <p className={styles.privacy}><LockKeyhole size={14} aria-hidden="true"/><span>Your account settings are private. Your profile and shared shelves are managed from your reading space. <a href="/privacy">Read about privacy and your data.</a></span></p>

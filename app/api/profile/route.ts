@@ -5,6 +5,7 @@ import { getOwnProfile,profileSummary } from '@/lib/server/profiles';
 import { idSchema,makePublicProfile } from '@/lib/server/validation';
 import { verifiedShelfImages } from '@/lib/server/publication-images';
 import type { AppState } from '@/lib/types';
+import { requireParticipation } from '@/lib/server/moderation';
 
 export const dynamic='force-dynamic';
 const publishInput=z.object({shelfId:idSchema,name:z.string().min(1).max(80),bio:z.string().max(1000),shelfUpdatedAt:z.string().max(40)});
@@ -16,6 +17,7 @@ export async function GET(request:Request){return handled(async()=>{
 
 export async function POST(request:Request){return handled(async()=>{
   sameOrigin(request);const user=await authenticated(request);
+  await requireParticipation(user.userId);
   const input=publishInput.safeParse(await readJson(request,4096));
   if(!input.success)throw new HttpError(400,'Choose a shelf and save your profile before publishing.');
   const library=await getLibrary(user.userId);

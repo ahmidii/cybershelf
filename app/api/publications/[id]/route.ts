@@ -1,11 +1,13 @@
+import { getCurrentUser } from '@/app/auth';
+import { publicContentSql, viewerCanSee } from '@/lib/server/moderation';
 import { authenticated, handled, HttpError, json, sameOrigin } from '@/lib/server/http';
 import { database } from '@/lib/server/storage';
 
 export const dynamic='force-dynamic';
 type Context={params:Promise<{id:string}>};
 export async function GET(_request:Request,context:Context){return handled(async()=>{
-  const {id}=await context.params;const row=await database().prepare('SELECT p.snapshot, r.id AS profile_id FROM publications p LEFT JOIN public_profiles r ON r.owner_id = p.owner_id WHERE p.id = ?').bind(id).first<{snapshot:string;profile_id:string|null}>();
-  if(!row)throw new HttpError(404,'This shelf is private or no longer shared.');return json({...JSON.parse(row.snapshot),...(row.profile_id?{profileId:row.profile_id}:{})});
+  const {id}=await context.params;const row=await database().prepare(`SELECT p.snapshot,p.owner_id,r.id AS profile_id FROM publications p LEFT JOIN public_profiles r ON r.owner_id = p.owner_id AND ${publicContentSql('profile','r.id','r.owner_id')} WHERE p.id = ? AND ${publicContentSql('shelf','p.id','p.owner_id')}`).bind(id).first<{snapshot:string;owner_id:string;profile_id:string|null}>();
+  if(!row||!await viewerCanSee((await getCurrentUser())?.userId,row.owner_id))throw new HttpError(404,'This shelf is private or no longer shared.');return json({...JSON.parse(row.snapshot),...(row.profile_id?{profileId:row.profile_id}:{})});
 });}
 export async function DELETE(request:Request,context:Context){return handled(async()=>{
   sameOrigin(request);const user=await authenticated(request);const {id}=await context.params;

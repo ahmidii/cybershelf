@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0-beta.1 — Username accounts and recovery keys — unreleased
+## 0.8.0 — Accounts, safety, and public-beta preparation — 2026-11-09
 
 ### Added
 
@@ -8,6 +8,11 @@
 - A recovery key shown once after signup or replacement, with copy/download controls and an explicit saved-key acknowledgement. Recovery replaces the password and key, revokes sessions, and requires a new sign-in.
 - Existing email accounts retain their sign-in and recovery paths, and can claim a username after fresh authentication and current-password confirmation.
 - A public privacy explanation covering pseudonymous accounts, deliberately shared content, server-readable data, external image hosts, and beta limitations.
+- Complete account-deletion requests with a fresh-session/current-password check, explicit confirmation, atomic live-record removal, durable file cleanup, and a minimal 35-day erasure ledger for recovery reconciliation.
+- Canonical reports for profiles, shelves, reading updates, replies, book announcements, and manually contributed book pages. Bounded explanations, durable rate limits, and duplicate controls keep the queue manageable without exposing reporters to reported readers.
+- Reciprocal reader blocking and `/safety` management. Blocking removes mutual follows and filters authenticated public views, feeds, reading rooms, replies, and public image access.
+- An operator queue at `/moderation`, restricted to configured immutable account IDs. Recent-sign-in checks, recorded decisions, content hiding/restoration, and account participation suspension/restoration are included. Private library/export/security/deletion access is preserved during suspension.
+- Operational runbooks and tooling for private original-file recovery copies, bounded maintenance, safe status checks, erasure-aware restoration, and production audit evidence. These do not establish that the live installation is configured or verified.
 
 ### Hardened
 
@@ -15,11 +20,19 @@
 - New password hashes use versioned native scrypt with fixed parameters and constant-time comparisons. Legacy hashes and existing shorter passwords remain compatible. Password derivation has a bounded queue.
 - Recovery and account-identity changes use durable attempt limits, same-origin checks, expected-account checks, and conditional database writes.
 - HTML responses reject framing; responses include no-referrer and nosniff headers. Sensitive account routes remain private and non-cacheable.
+- Better Auth and its Drizzle adapter are pinned to 1.7.16. The maintainer approved exact-version release-age exceptions for this security update and required package family; the general seven-day policy remains enabled.
+- Uploads atomically reserve bytes and file count before R2 writes. Reservations and pending cleanup count toward the allowance, finalization rechecks account state, and durable retries handle interruptions. Conditional writes and empty cancellation barriers prevent unresolved uploads from recreating erased originals.
+- Multipart bodies and simultaneous in-isolate parsing are bounded; durable upload attempt limits run before body parsing.
+- Database guards close races between account deletion/suspension/blocking and stale public writes. Manual catalog creation also rechecks the acting account within its final insertion predicate.
+- Public visibility and original access honor moderation/deletion state on the server. Legacy reading-room indexing skips suspended authors so one old post cannot block everyone else's reading room.
 
-### Release hold
+### Release status and boundaries
 
-- The source candidate has not been deployed. Better Auth and its adapter remain at 1.7.8 pending the 1.7.16 security update. The existing seven-day dependency release-age policy blocked the update on 2026-11-09; it has not been disabled or bypassed. See [release status](docs/release-status.md).
-- Self-service account deletion, reporting/blocking, verified production restore procedures, and physical-device gesture testing remain outside this candidate.
+- Expanded source validation includes TypeScript, the production build, 201 regression cases and disposable recovery fixtures. Publication is confirmed by this commit's Cloudflare build check; production readiness still requires the operational evidence below. See [release status](docs/release-status.md).
+- Wider public promotion still requires verified moderator IDs and review responsibility, administrator/MFA and token review, bucket privacy, actual D1 recovery coverage, complete file backups, an isolated restore exercise, and tested alert delivery. The attempted Cloudflare dashboard sign-in returned HTTP 403, so settings unavailable through that route remain unverified.
+- Public content remains accessible when signed out. Reporting is not end-to-end encrypted, and no automatic moderation decisions or decision emails are sent. Shared ownerless title/author records can remain after account deletion.
+- Recovery copies follow a 30-day policy, with storage-expiry processing lag. Restoration must use current account security and a current erasure ledger; the 35-day ledger must cover the actual surviving backup history.
+- Ordinary image uploads may retain embedded metadata, and physical-device gesture/camera testing remains separate from automated checks.
 
 ## 0.7.0 — Pages, touch, and real spines — 2026-10-23
 

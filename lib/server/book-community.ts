@@ -8,13 +8,14 @@ import { database, getLibrary } from './storage';
 import { HttpError } from './http';
 import { reserveReadingAction } from './journal';
 import { indexLegacyReadingPosts } from './reading-room';
+import { publicContentSql, publicOwnerSql } from './moderation';
 
 interface CommunityBookRow { id: string; title: string; author: string; created_at: string; }
 interface CommunityScope { id: string; legacyKey?: string; }
 
 export async function readCommunityCatalogBook(id: string): Promise<CatalogBook | null> {
   if (!/^cs_[a-f0-9]{64}$/.test(id)) return null;
-  const row = await database().prepare('SELECT id,title,author,created_at FROM community_books WHERE id = ?').bind(id).first<CommunityBookRow>();
+  const row = await database().prepare(`SELECT id,title,author,created_at FROM community_books b WHERE id = ? AND ${publicContentSql('book','b.id')}`).bind(id).first<CommunityBookRow>();
   return row ? {
     id: row.id, source: 'community', title: row.title, author: row.author,
     authors: row.author ? [row.author] : [], description: '', coverUrl: '', subjects: [],
@@ -36,7 +37,7 @@ export async function registerCommunityBook(ownerId: string, localBookId: string
   await reserveReadingAction(ownerId, 'catalog');
   const db = database();
   const results = await db.batch([
-    db.prepare('INSERT INTO community_books (id,title,author,created_at) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM libraries WHERE owner_id = ? AND version = ?) ON CONFLICT(id) DO NOTHING')
+    db.prepare(`INSERT INTO community_books (id,title,author,created_at) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM libraries l WHERE l.owner_id = ? AND l.version = ? AND ${publicOwnerSql('l.owner_id')}) ON CONFLICT(id) DO NOTHING`)
       .bind(id, title, author, new Date().toISOString(), ownerId, library.version),
     db.prepare('SELECT version FROM libraries WHERE owner_id = ?').bind(ownerId),
   ]);
@@ -70,7 +71,7 @@ function sharedCompletions(scope: CommunityScope, ownerId?: string) {
     sql: `SELECT p.owner_id FROM reading_posts p
       JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id
       JOIN auth_user u ON u.id = p.owner_id
-      WHERE ${identity} AND json_type(p.snapshot,'$.entry.progress') IN ('integer','real')
+      WHERE ${identity} AND ${publicContentSql('profile','r.id','r.owner_id')} AND ${publicContentSql('post','p.id','p.owner_id')} AND json_type(p.snapshot,'$.entry.progress') IN ('integer','real')
       AND json_extract(p.snapshot,'$.entry.progress') = 100${ownerId ? ' AND p.owner_id = ?' : ''}
       GROUP BY p.owner_id`,
     bindings,
@@ -83,9 +84,9 @@ function sharedCompletions(scope: CommunityScope, ownerId?: string) {
 async function communitySnapshot(scope: CommunityScope, ownerId?: string): Promise<BookCommunityResponse | BookCommunityMutationResponse> {
   const db = database(), shared = sharedCompletions(scope);
   const statements = [
-    db.prepare('SELECT AVG(rating) AS average_rating,COUNT(*) AS rating_count FROM book_ratings WHERE catalog_id = ?').bind(scope.id),
+    db.prepare(`SELECT AVG(rating) AS average_rating,COUNT(*) AS rating_count FROM book_ratings br WHERE catalog_id = ? AND ${publicOwnerSql('br.owner_id')}`).bind(scope.id),
     db.prepare(`WITH contributions AS (
-      SELECT owner_id,COUNT(*) AS reads FROM book_reads WHERE catalog_id = ? GROUP BY owner_id
+      SELECT owner_id,COUNT(*) AS reads FROM book_reads br WHERE catalog_id = ? AND ${publicOwnerSql('br.owner_id')} GROUP BY owner_id
       UNION ALL SELECT owner_id,1 AS reads FROM (${shared.sql})
     ), per_reader AS (SELECT owner_id,MAX(reads) AS reads FROM contributions GROUP BY owner_id)
     SELECT COALESCE(SUM(reads),0) AS read_count,COUNT(*) AS reader_count FROM per_reader`)

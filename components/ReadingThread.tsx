@@ -1,5 +1,6 @@
 'use client';
 
+import SafetyActions from './SafetyActions';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, BookOpen, LoaderCircle, MessageCircle, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import type { Book, ReadingComment, ReadingPost, StateResponse } from '@/lib/types';
@@ -208,7 +209,7 @@ export default function ReadingThread({ id }: { id: string }) {
         <article className={styles.thought}>
           <header className={styles.entryHeader}><a href={'/u/' + encodeURIComponent(thread.post.profileId)}>{thread.post.name}</a><time dateTime={thread.post.entry.createdAt}>{readingDate(thread.post.entry.createdAt)}</time></header>
           {thread.post.entry.body ? <><div hidden={checkingViewer}><SpoilerText key={thread.viewer.accountId ?? 'guest'} body={thread.post.entry.body} progress={thread.post.entry.progress} readerProgress={readerProgress} unread={unread} defaultHide={protect}/></div>{checkingViewer && <p className={styles.help} role="status">Checking your reading place…</p>}</> : <p className={styles.milestone}>{thread.post.entry.progress === 100 ? 'Finished this book.' : thread.post.entry.progress === 0 ? 'Started a new reading journey.' : `Reached ${displayReadingProgress(thread.post.entry.progress)}% of this book.`}</p>}
-          <footer className={styles.entryFooter}><span><BookOpen size={14}/>{progressLabel(thread.post.entry.progress, thread.post.entry.page)}</span><span><MessageCircle size={14}/>{thread.comments.length} {thread.comments.length === 1 ? 'reply' : 'replies'}</span></footer>
+          <SafetyActions kind="post" targetId={thread.post.id}/><footer className={styles.entryFooter}><span><BookOpen size={14}/>{progressLabel(thread.post.entry.progress, thread.post.entry.page)}</span><span><MessageCircle size={14}/>{thread.comments.length} {thread.comments.length === 1 ? 'reply' : 'replies'}</span></footer>
         </article>
         <section className={styles.replies} aria-label="Replies">
           <h2>A little company along the way</h2>
@@ -216,7 +217,7 @@ export default function ReadingThread({ id }: { id: string }) {
           {thread.comments.map(comment => <article id={'comment-' + comment.id} className={styles.reply} key={comment.id}>
             <header className={styles.entryHeader}><strong>{comment.profileId ? <a href={'/u/' + encodeURIComponent(comment.profileId)}>{comment.name}</a> : comment.name}</strong><time dateTime={comment.createdAt}>{readingDate(comment.createdAt)}</time></header>
             <div hidden={checkingViewer}><SpoilerText key={thread.viewer.accountId ?? 'guest'} body={comment.body} progress={comment.progress} readerProgress={readerProgress} unread={unread} defaultHide={protect}/></div>{checkingViewer && <p className={styles.help}>Checking your reading place…</p>}
-            <footer className={styles.entryFooter}><span>{progressLabel(comment.progress)} marker</span>{!checkingViewer && comment.canDelete && (deleting === comment.id ? <span><button className="text-button danger-text" disabled={busy} onClick={() => void removeComment(comment)}>Remove reply</button><button className="text-button" disabled={busy} onClick={() => setDeleting(null)}>Keep it</button></span> : <button className="text-button" onClick={() => setDeleting(comment.id)} aria-label={'Remove reply by ' + comment.name}><Trash2 size={13}/>{thread.viewer.canModerate ? 'Remove' : 'Delete'}</button>)}</footer>
+            <SafetyActions kind="comment" targetId={comment.id}/><footer className={styles.entryFooter}><span>{progressLabel(comment.progress)} marker</span>{!checkingViewer && comment.canDelete && (deleting === comment.id ? <span><button className="text-button danger-text" disabled={busy} onClick={() => void removeComment(comment)}>Remove reply</button><button className="text-button" disabled={busy} onClick={() => setDeleting(null)}>Keep it</button></span> : <button className="text-button" onClick={() => setDeleting(comment.id)} aria-label={'Remove reply by ' + comment.name}><Trash2 size={13}/>{thread.viewer.canModerate ? 'Remove' : 'Delete'}</button>)}</footer>
           </article>)}
         </section>
         {error && <p className="notice error" role="alert">{error}</p>}

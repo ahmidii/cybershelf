@@ -1,5 +1,6 @@
 'use client';
 
+import SafetyActions from './SafetyActions';
 import { useEffect,useState } from 'react';
 import { ArrowUpRight,Copy,LoaderCircle,Star } from 'lucide-react';
 import type { PublicBook,PublicProfile as Profile } from '@/lib/types';
@@ -28,7 +29,7 @@ export default function PublicProfile({id}:{id:string}){
     <header className={styles.publicHeader}><a href="/" className={styles.brand} aria-label="Cybershelf home"><BrandWordmark/></a><a href="/" className={styles.homeLink}>Make yourself a shelf <ArrowUpRight size={16}/></a></header>
     <main className={styles.publicMain}>
       {loading?<div className={styles.pageState} aria-busy="true"><LoaderCircle size={26} className="spin"/><p>Opening a reader’s corner…</p></div>:error?<div className={styles.pageState}><h1>Profile unavailable</h1><p>{error}</p><a href="/" className="button primary">Explore cybershelf <ArrowUpRight size={15}/></a></div>:profile?<>
-        <header className={`${styles.identity} ${styles.publicIdentity}`}><span className={styles.avatar} aria-hidden="true">{profile.name.slice(0,1).toLocaleUpperCase()}</span><div><p className={styles.kicker}>A reader on cybershelf</p><h1>{profile.name}</h1>{profile.bio?<p className={styles.bio}>{profile.bio}</p>:null}</div><FollowButton profileId={profile.id} className={styles.publicFollow}/></header>
+        <header className={`${styles.identity} ${styles.publicIdentity}`}><span className={styles.avatar} aria-hidden="true">{profile.name.slice(0,1).toLocaleUpperCase()}</span><div><p className={styles.kicker}>A reader on cybershelf</p><h1>{profile.name}</h1>{profile.bio?<p className={styles.bio}>{profile.bio}</p>:null}</div><FollowButton profileId={profile.id} className={styles.publicFollow}/><SafetyActions kind="profile" targetId={profile.id}/></header>
         <section className={styles.publicFeature} aria-label="Featured shelf">
           <div className={styles.featureHeading}><div><span className={styles.featureLabel}><Star size={13}/>Featured shelf</span><h2>{profile.featured.shelf.title}</h2>{profile.featured.shelf.description?<p>{profile.featured.shelf.description}</p>:null}</div><span className={styles.bookCount}>{profile.featured.bookCount} {profile.featured.bookCount===1?'book':'books'}</span></div>
           <div className={styles.shelfFrame}><ShelfCanvas shelf={profile.featured.shelf} books={profile.featured.books} onBookOpen={bookId=>openBook(profile.featured.books.find(book=>book.id===bookId)??null)}/></div>

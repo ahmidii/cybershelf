@@ -1,5 +1,6 @@
 'use client';
 
+import SafetyActions from './SafetyActions';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, BookOpen, LoaderCircle, MessageCircle, ShieldCheck } from 'lucide-react';
 import type { Book, ReadingPost, StateResponse } from '@/lib/types';
@@ -128,7 +129,7 @@ export default function ProfileJournal({ profileId, name }: { profileId: string;
     {viewerError && <p className={styles.help} role="status">{viewerError} <button className="text-button" onClick={() => setViewerRetry(value => value + 1)}>Check again</button></p>}
     <div className={styles.journalEntries}>{visible.map(post => {
       const key = readingBookKey(post.book), known = readerPosition(post.book, books), override = viewerError ? undefined : positions[key];
-      return <article key={post.id} className={styles.profileEntry}>
+      return <article key={post.id} className={styles.profileEntry}><SafetyActions kind="post" targetId={post.id}/>
         <div className={styles.entryBook}><BookCover book={post.book} small/><div><h3>{post.book.title}</h3><p>{post.book.author}</p><span className={styles.marker}>{progressLabel(post.entry.progress, post.entry.page)}</span></div><time dateTime={post.entry.createdAt}>{readingDate(post.entry.createdAt)}</time></div>
         {post.entry.body ? <><div hidden={checkingViewer}><SpoilerText key={viewerError ? 'unknown' : viewerAccount ?? 'guest'} body={post.entry.body} progress={post.entry.progress} readerProgress={override ?? known.progress} unread={override === undefined ? known.unread : override === 0} defaultHide={!!viewerError || protect}/></div>{checkingViewer && <p className={styles.help}>Checking your reading place…</p>}</> : <p className={styles.milestone}>{post.entry.progress === 100 ? 'Finished this book.' : post.entry.progress === 0 ? 'Started reading.' : `Reached ${displayReadingProgress(post.entry.progress)}%.`}</p>}
         <footer className={styles.entryFooter}><a href={'/j/' + encodeURIComponent(post.id)}><MessageCircle size={14}/>{post.commentCount ? `${post.commentCount} ${post.commentCount === 1 ? 'reply' : 'replies'}` : 'Read along & reply'}<ArrowUpRight size={13}/></a>{bookFilter === 'all' && <button className="text-button" onClick={() => { setBookFilter(key); setOrder('progress'); }}>Follow this book’s journey</button>}</footer>

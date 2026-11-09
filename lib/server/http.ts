@@ -55,7 +55,8 @@ export async function readJson(request:Request,max=2*1024*1024):Promise<unknown>
 export async function handled(action:()=>Promise<Response>):Promise<Response> {
   try{return await action();}catch(error){
     if(error instanceof HttpError)return json({error:error.message,...(error.code?{code:error.code}:{})},error.status);
-    console.error('cybershelf API failure', error instanceof Error?error.message:'Unknown error');
+    // Database/provider messages can contain a reader's private parameters.
+    console.error('cybershelf API request failed');
     return json({error:'Something went wrong. Please try again.'},500);
   }
 }

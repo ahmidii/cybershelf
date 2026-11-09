@@ -1,0 +1,62 @@
+name: Production health
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: 'Fail this check to test your GitHub notification delivery; the site is unchanged'
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: production-health
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Forks must explicitly configure their own monitoring destination.
+    if: github.repository == 'ahmidii/cybershelf'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check public account, moderation, cleanup and backup health
+        env:
+          SIMULATE_FAILURE: ${{ inputs.simulate_failure || false }}
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          if (process.env.SIMULATE_FAILURE === 'true') {
+            console.error('::error::Intentional notification delivery drill. Cybershelf was not changed.');
+            process.exit(1);
+          }
+          const required = ['moderationConfigured', 'maintenanceConfigured', 'maintenanceRecent',
+            'cleanupHealthy', 'backupConfigured', 'backupRecent'];
+          let failure = 'Health endpoint unavailable';
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const response = await fetch('https://cybershelf.io/api/health?check=operations', {
+                redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(10_000),
+              });
+              if (!response.ok) throw new Error('Health endpoint unavailable');
+              const body = await response.text();
+              if (body.length > 16_384) throw new Error('Invalid health response');
+              const health = JSON.parse(body);
+              const missing = required.filter(key => health.operations?.[key] !== true);
+              if (health.accounts !== true) missing.unshift('accounts');
+              if (!missing.length) {
+                console.log('Public account configuration, moderation, cleanup and backup checks passed.');
+                process.exit(0);
+              }
+              failure = 'Health checks need attention: ' + missing.join(', ');
+            } catch { failure = 'Health endpoint unavailable or invalid'; }
+            if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          console.error('::error::' + failure);
+          console.error('Review docs/production-operations.md. No account data or credentials were requested.');
+          process.exit(1);
+          JS

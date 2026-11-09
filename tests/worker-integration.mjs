@@ -10,6 +10,10 @@ import { runReadingRoomIntegration } from '../lib/server/reading-room.integratio
 import { runBookCommunityIntegration } from '../lib/server/book-community.integration.mjs';
 import { runAccountLifecycleIntegration } from '../lib/server/account-lifecycle.integration.mjs';
 import { runUsernameAccountIntegration } from '../lib/server/username-accounts.integration.mjs';
+import { runAssetTransferIntegration } from '../lib/server/asset-transfers.integration.mjs';
+import { runAccountDeletionIntegration } from '../lib/server/account-deletion.integration.mjs';
+import { runModerationIntegration } from '../lib/server/moderation.integration.mjs';
+import { runOriginalBackupIntegration } from '../lib/server/original-backups.integration.mjs';
 
 // Reuse Wrangler's pinned Miniflare without adding a second runtime version.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -44,7 +48,7 @@ const baseOptions = {
   port: 0,
   cf: false,
   log: new Log(LogLevel.WARN),
-  bindings: { APP_ORIGIN: base, BETTER_AUTH_SECRET: randomBytes(32).toString('hex') },
+  bindings: { APP_ORIGIN: base, BETTER_AUTH_SECRET: randomBytes(32).toString('hex'), MODERATOR_USER_IDS: 'moderator_fixture', MAINTENANCE_ENABLED: 'true' },
   d1Databases: { DB: 'cybershelf-ephemeral-test-db' },
   r2Buckets: { BUCKET: 'cybershelf-ephemeral-test-files' },
   // No d1Persist/r2Persist, credentials, resource IDs, or remote bindings.
@@ -57,6 +61,7 @@ const baseOptions = {
 };
 const fixture = new Miniflare(baseOptions);
 let mailFixture;
+let backupFixture;
 
 const mailbox = {
   messages: [],
@@ -167,9 +172,76 @@ try {
   await runAccountLifecycleIntegration({ base, fetch: mailFetch, database: mailDatabase, mailbox, report: message => console.log('✓ ' + message) });
   mailbox.fail = false;
   await runUsernameAccountIntegration({ base, fetch: mailFetch, database: mailDatabase, mailbox, report: message => console.log('✓ ' + message) });
+  const mailBucket = await mailFixture.getR2Bucket('BUCKET');
+  await runAssetTransferIntegration({ base, fetch: mailFetch, database: mailDatabase, bucket: mailBucket, report: message => console.log('✓ ' + message) });
+  await runModerationIntegration({ base, fetch: mailFetch, database: mailDatabase, report: message => console.log('✓ ' + message) });
+  await runAccountDeletionIntegration({ base, fetch: mailFetch, database: mailDatabase, bucket: mailBucket, authBindings: baseOptions.bindings, report: message => console.log('✓ ' + message) });
+
+  // Recovery scans require isolated, complete originals. Other suites deliberately
+  // seed metadata without bytes and must never make a backup silently skip loss.
+  backupFixture = new Miniflare({ ...baseOptions, name: 'cybershelf-original-backup-integration',
+    r2Buckets: { BUCKET: 'cybershelf-backup-fixture-originals', BACKUP_BUCKET: 'cybershelf-backup-fixture-copies' } });
+  const backupDatabase = await backupFixture.getD1Database('DB');
+  for (const migration of journal.entries) {
+    const statements = readFileSync(resolve(root, 'drizzle', migration.tag + '.sql'), 'utf8')
+      .split('--> statement-breakpoint').map(statement => statement.trim()).filter(Boolean);
+    await backupDatabase.batch(statements.map(statement => backupDatabase.prepare(statement)));
+  }
+  const originalBucket = await backupFixture.getR2Bucket('BUCKET');
+  const backupBucket = await backupFixture.getR2Bucket('BACKUP_BUCKET');
+  const operationsHealth = async () => {
+    const response = await backupFixture.dispatchFetch(base + '/api/health?check=operations');
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    return response.json();
+  };
+  let operations = (await operationsHealth()).operations;
+  assert.deepEqual(operations, { moderationConfigured: false, maintenanceConfigured: true,
+    maintenanceRecent: false, cleanupHealthy: true, backupConfigured: true, backupRecent: false });
+  const now = Date.now(), syntheticKey = 'private/as_scheduled_cleanup_fixture';
+  await backupDatabase.prepare('INSERT INTO auth_user (id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)')
+    .bind('moderator_fixture', 'Synthetic moderator', 'moderator@example.invalid', 1, now, now).run();
+  await originalBucket.put(syntheticKey, 'synthetic obsolete bytes');
+  await backupDatabase.batch([
+    backupDatabase.prepare('INSERT INTO account_deletion_jobs (id,owner_id,requested_at,updated_at,next_attempt_at,attempts,lease_until) VALUES (?,?,?,?,?,0,0)')
+      .bind('scheduled_job_fixture', 'deleted_fixture_owner', now - 1000, now - 1000, now - 1000),
+    backupDatabase.prepare("INSERT INTO asset_transfers (id,owner_id,object_key,size,state,writer_done,created_at,updated_at,expires_at,next_attempt_at,attempts,lease_until) VALUES (?,?,?,24,'cleanup',1,?,?,?,?,0,0)")
+      .bind('as_scheduled_cleanup_fixture', 'deleted_fixture_owner', syntheticKey, now - 1000, now - 1000, now - 1000, now - 1000),
+  ]);
+  const scheduledWorker = await backupFixture.getWorker();
+  await scheduledWorker.scheduled({ cron: '*/5 * * * *', scheduledTime: now });
+  assert.equal(await originalBucket.head(syntheticKey), null, 'A real scheduled event drains durable file cleanup without a browser request');
+  assert.equal((await backupDatabase.prepare('SELECT COUNT(*) AS n FROM account_deletion_jobs').first()).n, 0);
+  const streamedKey = 'private/as_scheduled_backup_fixture';
+  const streamedBytes = new TextEncoder().encode('%PDF-1.7\nSynthetic native Worker streaming test.');
+  await originalBucket.put(streamedKey, streamedBytes, { httpMetadata: { contentType: 'application/pdf' } });
+  await backupDatabase.prepare('INSERT INTO assets (id,owner_id,kind,object_key,filename,mime,size,created_at) VALUES (?,?,?,?,?,?,?,?)')
+    .bind('as_scheduled_backup_fixture', 'moderator_fixture', 'book', streamedKey, 'synthetic.pdf', 'application/pdf', streamedBytes.length, new Date(now - 1000).toISOString()).run();
+  await scheduledWorker.scheduled({ cron: '2-59/5 * * * *', scheduledTime: now });
+  const streamedCopy = await backupBucket.get(streamedKey);
+  assert.ok(streamedCopy, 'The actual Worker scheduled handler streams an original to the separate R2 binding');
+  assert.deepEqual(new Uint8Array(await streamedCopy.arrayBuffer()), streamedBytes);
+  operations = (await operationsHealth()).operations;
+  assert.deepEqual(operations, { moderationConfigured: true, maintenanceConfigured: true,
+    maintenanceRecent: true, cleanupHealthy: true, backupConfigured: true, backupRecent: true });
+  assert.equal(JSON.stringify(operations).includes('moderator_fixture'), false);
+  await backupDatabase.prepare("INSERT INTO asset_transfers (id,owner_id,object_key,size,state,writer_done,created_at,updated_at,expires_at,next_attempt_at,attempts,lease_until) VALUES (?,?,?,24,'cleanup',1,?,?,?,?,1,0)")
+    .bind('as_failed_removal_fixture', 'moderator_fixture', 'private/as_failed_removal_fixture', now, now, now, now + 60_000).run();
+  assert.equal((await operationsHealth()).operations.cleanupHealthy, false, 'A failed file removal cannot pass health just because no account deletion is pending');
+  await backupDatabase.prepare('DELETE FROM asset_transfers WHERE id=?').bind('as_failed_removal_fixture').run();
+  await backupDatabase.prepare("UPDATE maintenance_state SET value=json_set(value,'$.lastCompletedAt',?) WHERE key='housekeeping.v1'")
+    .bind(now - 16 * 60_000).run();
+  assert.equal((await operationsHealth()).operations.maintenanceRecent, false, 'A stale completed maintenance run fails the monitor');
+  await backupDatabase.prepare('DELETE FROM assets').run();
+  await originalBucket.delete(streamedKey);
+  await backupBucket.delete(streamedKey);
+  await backupDatabase.prepare('DELETE FROM maintenance_state').run();
+  console.log('✓ Real scheduled cleanup and original-backup events persist health evidence; missing moderators and stale runs fail readiness without exposing identities.');
+  await runOriginalBackupIntegration({ database: backupDatabase, bucket: originalBucket, backupBucket, report: message => console.log('✓ ' + message) });
   console.log('Worker integration checks passed; no external resources were used.');
 } finally {
   for (const waiting of mailbox.waiting) clearTimeout(waiting.timeout);
   if (mailFixture) await mailFixture.dispose();
+  if (backupFixture) await backupFixture.dispose();
   await fixture.dispose();
 }

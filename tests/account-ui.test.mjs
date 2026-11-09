@@ -18,7 +18,7 @@ function componentModule(relative) {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
     fileName: path,
   }).outputText
-    .replace(/import styles from ['"][^'"]+\.module\.css['"];?/g, 'const styles = {};')
+    .replace(/import ([A-Za-z_$][\w$]*) from ['"][^'"]+\.module\.css['"];?/g, (_match, identifier) => `const ${identifier} = {};`)
     .replace(/from (['"])([^'"]+)\1/g, (_, _quote, specifier) => {
       if (specifier.startsWith('@/') || specifier.startsWith('.')) {
         const target = specifier.startsWith('@/') ? resolve(root, specifier.slice(2)) : resolve(dirname(path), specifier);

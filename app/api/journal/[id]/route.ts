@@ -9,9 +9,9 @@ type Context={params:Promise<{id:string}>};
 export async function GET(_request:Request,context:Context){return handled(async()=>{
   const {id}=await context.params;
   if(!idSchema.safeParse(id).success)throw new HttpError(404,'This reading entry is private or no longer shared.');
-  const row=await getPublicReadingPost(id);
-  if(!row)throw new HttpError(404,'This reading entry is private or no longer shared.');
   const viewer=await getCurrentUser();
+  const row=await getPublicReadingPost(id,viewer?.userId);
+  if(!row)throw new HttpError(404,'This reading entry is private or no longer shared.');
   const comments=await readingComments(row,viewer?.userId);
   return json({post:readingPostDto(row),comments,viewer:{accountId:viewer?.userId??null,canModerate:viewer?.userId===row.owner_id}});
 });}

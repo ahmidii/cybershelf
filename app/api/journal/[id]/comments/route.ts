@@ -12,7 +12,7 @@ export async function POST(request:Request,context:Context){return handled(async
   sameOrigin(request);const user=await authenticated(request);const {id}=await context.params;
   const parsed=commentInput.safeParse(await readJson(request,32768));
   if(!parsed.success)throw new HttpError(400,'Write a reply of up to 4,000 characters and choose a reading progress between 0 and 100%.');
-  const post=await getPublicReadingPost(id);
+  const post=await getPublicReadingPost(id,user.userId);
   if(!post)throw new HttpError(404,'This reading entry is private or no longer shared.');
   const snapshot=readingPostDto(post);
   if(parsed.data.progress<snapshot.entry.progress)throw new HttpError(400,`Mark this reply at ${snapshot.entry.progress}% or later so readers can avoid spoilers.`);

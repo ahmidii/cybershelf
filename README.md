@@ -4,7 +4,9 @@ A place to collect books, arrange personal shelves, and keep a reading life with
 
 cybershelf separates a **Library** from the shelves you make with it. A book can be something you own, borrowed, have read, or simply want to remember. Add it once, then display it on as many themed shelves as you like. The `cybershe\f` wordmark and `||\` icon echo upright and leaning books, paired with a consistent serif-and-sans interface.
 
-This source prepares version 0.8: username accounts with no required email, saved recovery keys, and stronger controls for new passwords, alongside page-based reading updates, touch shelf controls, and real spine-photo cropping. The source is MIT licensed. The canonical source repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf). The deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account; building the source alone does not activate the domain. See [release status](docs/release-status.md) for the current verification and deployment status, including the pending authentication dependency update.
+This source prepares the **0.8.0 public-beta candidate**: username accounts without a required email, recovery keys, complete account-deletion requests, reporting and blocking, a moderator queue, and atomic upload quotas. It retains page-based reading updates, touch shelf controls, and real spine-photo cropping. Better Auth and its adapter are pinned to 1.7.16 under the maintainer-approved, exact-version dependency-age exceptions.
+
+The source is MIT licensed. The canonical repository is [ahmidii/cybershelf](https://github.com/ahmidii/cybershelf), and the deployment configuration targets `cybershelf.io` in the maintainer’s Cloudflare account. **Local acceptance passed: 201 regression cases, the production Worker integration suite, and an isolated recovery rehearsal. Confirm production publication from the commit’s Cloudflare build check and live health endpoint.** Production moderation setup, administrator security, bucket privacy, backups, restoration, and alert delivery need recorded operational evidence before a wider launch. See [release status](docs/release-status.md) and [beta readiness](docs/beta-readiness.md).
 
 ## What you can do
 
@@ -24,7 +26,9 @@ This source prepares version 0.8: username accounts with no required email, save
 - **Read with company:** follow public profiles, browse shared reading journeys, and reply to individual entries with your own progress marker. Thoughts beyond your saved progress, or about unread books, are hidden by default until you reveal them.
 - **Keep a reading circle:** the Following feed includes shared journal updates, replies, newly published or updated shelves, and explicit “bought a book” / “added to my library” posts. Private library changes and imports are never broadcast.
 - **Share deliberately:** publish a shelf snapshot, browse published shelves, save an interesting title, or make your own version of another shelf's arrangement. Custom artwork stays with its owner when a shelf is copied.
+- **Choose your company:** report public content, block a reader, and manage blocks in **Safety & blocked readers**. Blocking removes mutual follows and filters both readers' signed-in views. Public content remains accessible to signed-out visitors.
 - **Take your data with you:** export catalog/shelves as JSON, reading records as CSV, and uploaded originals in a ZIP backup.
+- **Leave when you choose:** delete your account from **Account & security** after a fresh sign-in, current-password check, and explicit confirmation. Account access and associated live records are removed together; file erasure is durably retried if storage is temporarily unavailable.
 
 The guest preview is labelled sample content. Editing as a guest creates a draft in that browser. Sign in to save an account library across devices, upload files, and publish shelves. Importing a browser draft into an untouched account preserves the signup name and removes the local draft only after a successful save. A customized account collection is never replaced by this shortcut. A browser draft is not a substitute for an account backup.
 
@@ -52,7 +56,7 @@ Public ratings and explicit completed-read logs are separate from private Librar
 
 Your account library, source links, physical locations, original book files, reviews, and private notes stay private. Publishing a shelf creates a separate snapshot containing the display name, shelf title/description, visible books, arrangement, and decorations. The staging tray is excluded. Selecting a featured shelf stays private until you publish your profile, which is independent of Explore shelf publications.
 
-Private account data is protected by authorization, not end-to-end encryption: the service operator can access stored library metadata. The Hardcover connector does not send provider tokens to the server, persist them in browser storage, or put them in backups. Its read scopes exclude account/email access and writes. Operator control of delivered JavaScript remains a trust boundary; this is not a zero-knowledge service.
+Private account data is protected by authorization. It is not end-to-end encrypted: the service operator can access stored library metadata and files. The Hardcover connector does not send provider tokens to the server, persist them in browser storage, or put them in backups. Its read scopes exclude account/email access and writes. Operator control of delivered JavaScript remains a trust boundary.
 
 Reading entries start private. **Share update** publishes only the chosen entry, its marker, and the book’s public metadata. Future edits stay private until you update the shared entry. Replies are public within that conversation. Do not put later events under an earlier marker: spoiler controls compare declared progress, not the meaning of the text, and public writing is not confidential. Editions are matched conservatively by normalized title and author, with percentages used across page counts; readers can adjust the protection locally.
 
@@ -62,6 +66,14 @@ Follows connect readers to a currently public profile. Book purchases and additi
 
 See [the architecture notes](docs/architecture.md) for the API and ownership boundaries.
 
+## Account deletion and community safety
+
+An accepted account-deletion request removes the account, sessions, recovery credentials, private library, published shelves/profile, reading content, follows, contributions, and linked report/audit text in one database transaction. Uploaded originals and artwork lose their serving records immediately. Durable cleanup removes the bytes or, for an unresolved in-flight write, replaces them with an empty cancellation marker that cannot be used to retrieve the original. A temporary storage outage leaves a retryable obligation without restoring account access. Shared title/author catalog records have no account owner and can remain as bibliographic data. Saved copies held by other people cannot be recalled.
+
+Reports resolve their target from existing public records and contain a bounded public excerpt plus the reporter's explanation. The reported reader does not receive the reporter's identity or explanation. Blocks are reciprocal for authenticated views and stop new follows/replies; unblocking does not recreate a follow. Both controls are enforced on the server. Public information can still be viewed while signed out, so blocking is not a privacy boundary.
+
+The moderator queue at `/moderation` uses an explicit allowlist of immutable Cybershelf account IDs in `MODERATOR_USER_IDS`. There is no default administrator or automatic first-user promotion. Moderators can hide or restore reported content and pause or restore public participation, with a recent sign-in and an audit note. Suspended accounts retain private-library, export, security, and deletion access. The queue does not open unrelated private libraries or uploaded files. Operators still need to configure real moderators, assign review coverage, and provide a suitable private support contact. See [moderation](docs/moderation.md) and [upload storage](docs/upload-storage.md).
+
 ## Release limits
 
 | Resource | Limit |
@@ -69,18 +81,21 @@ See [the architecture notes](docs/architecture.md) for the API and ownership bou
 | Books in a library | 2,000 |
 | Shelves in a library | 100 |
 | Catalog payload | 2 MB |
-| EPUB or PDF upload | 25 MB per file |
-| PNG, JPEG, or WebP upload | 4 MB per file |
-| Uploaded storage | 500 MB or 1,000 files per account |
+| EPUB or PDF upload | 25 MiB per file |
+| PNG, JPEG, or WebP upload | 4 MiB per file |
+| Uploaded storage | 500 MiB or 1,000 files per account, including reservations and pending cleanup |
+| Active upload reservations | 4 per account |
 | Goodreads CSV import | 10 MB and 2,000 book rows |
 | Complete ZIP export | 100 MB |
 | Reading updates | 200 per book, 4,000 characters each |
 | Replies | 100 per shared entry, 4,000 characters each |
 | Reply posting | 10 per minute and 200 per day |
 | Following | 500 readers |
+| Blocked readers | 500 per account |
+| Report attempts | 5 per minute and 25 per day per account |
 | Connected accounts | 10 |
 
-Limits are currently implemented using powers of 1,024 bytes. Large libraries can export their catalog and download originals individually if they exceed the ZIP limit. Unknown or unreadable book metadata remains editable.
+Limits are implemented using powers of 1,024 bytes. Upload quota is reserved in one conditional database statement, so simultaneous requests cannot each consume the same remaining allowance. Multipart parsing and upload attempts have additional time, memory, and rate bounds described in [upload storage](docs/upload-storage.md). Large libraries can export their catalog and download originals individually if they exceed the ZIP limit. Unknown or unreadable book metadata remains editable.
 
 ## Run locally
 
@@ -109,25 +124,35 @@ pnpm run test:worker
 pnpm run deploy -- --dry-run
 ```
 
-The regression suite covers imports, backup round trips, physical shelf geometry, reading markers, validation, public/private field separation, and authentication boundaries. The Worker integration check runs the built application with disposable local D1/R2 storage and real account/session cookies. It does not use the production database or a Cloudflare API token. A deploy dry run validates the upload without applying remote migrations or publishing.
+The regression and Worker suites cover imports, backup round trips, physical shelf geometry, reading markers, validation, public/private separation, authentication, account deletion, moderation, blocks, and upload concurrency. Worker checks use disposable local D1/R2 storage and real test-account/session cookies. They do not use the production database or send account email to real recipients. A deploy dry run validates the upload without applying remote migrations or publishing. Available test cases are not a claim that this candidate's final run has passed; [release status](docs/release-status.md) records that separately.
 
 `pnpm run start --port 5173` previews the built Worker locally. Match `.dev.vars` to the origin you open. The separate `test:integration` command can target an existing local server through `CYBERSHELF_TEST_BASE_URL`; it refuses remote targets and creates temporary test accounts.
 
 ## Backup and restore
 
+### Your library exports
+
 JSON exports preserve catalog metadata, physical book appearance, shelves, the featured-shelf choice, private journal entries, file references, and connection preferences/provenance. They contain no provider credentials; accounts must be authorized again after restoring. They retain catalog work and edition identities, but do not transfer public profile identities, follows, public conversations, community ratings/read contributions, or publication permissions. CSV exports include reading-log JSON in an optional column. Restoring JSON on the original account reconnects files that still exist. A ZIP export additionally contains original uploads and a manifest mapping asset IDs to archive paths.
 
 This release restores the catalog JSON, not the ZIP as a single operation. For a different account or deployment, upload the files again and reconnect them; an imported asset ID does not transfer access to another account's files. Externally hosted covers and retailer purchases remain external links. Keep backups somewhere private if they contain notes, reviews, sources, or book files.
+
+### Operator recovery
+
+D1 recovery covers database records; it does not contain uploaded file bytes. The optional `BACKUP_BUCKET` stores separate private recovery copies of committed originals and artwork. Complete-scan freshness is tracked separately from whether the binding is configured. These periodic copies can lag new uploads and are not an atomic database-and-file snapshot. See [original file backups](docs/original-backups.md).
+
+The operator policy limits recovery copies and SQL/incident exports to 30 days. Storage expiration is asynchronous and may finish later, so this is a retention policy rather than a guarantee of removal at an exact second. A minimal erasure ledger retains only an opaque former account ID and deletion/expiry timestamps for 35 days. Any surviving backup history must fit within that reconciliation window; operators must address delayed expiry before restoring older data.
+
+A restore must preserve and apply the latest trusted account-security state and current erasure ledger before recovering files or serving traffic. It must revoke restored sessions/reset tokens and honor current suspensions, blocks, hiding, and publication withdrawals. An old database alone is not a safe source of current passwords or consumed recovery keys. The [production operations runbook](docs/production-operations.md) describes isolated rehearsal, reconciliation, privacy checks, and alert verification. Source tooling and a local drill do not prove that production backups or a production restore work.
 
 ## Hosting and contributing
 
 The current runtime is Vinext on Cloudflare Workers, with D1 for account records and publication snapshots and R2 for uploaded files. GitHub stores and collaborates on the source; a static GitHub Pages deployment alone cannot run these authenticated APIs.
 
-Standalone hosting is configured in `wrangler.jsonc`: Worker `cybershelf`, D1 `cybershelf-db` as `DB`, private R2 `cybershelf-files` as `BUCKET`, and the `cybershelf.io` custom domain. The deploy script applies pending migrations, publishes the built Worker, and configures a missing authentication secret through Cloudflare's encrypted runtime-secret API. Configured keys are preserved. It then checks the application's public account capability flags. Follow the [Cloudflare setup guide](docs/self-hosting.md) for the GitHub connection, build-token permission, and email activation. Forks must replace the resource identifiers and domain with their own.
+Standalone hosting is configured in `wrangler.jsonc`: Worker `cybershelf`, D1 `cybershelf-db` as `DB`, private R2 `cybershelf-files` as `BUCKET`, and the `cybershelf.io` custom domain. The deploy script first provisions/verifies the separate private `cybershelf-backups` bucket and its 30-day expiry rule, applies pending migrations, publishes the built Worker, and configures a missing authentication secret through Cloudflare's encrypted runtime-secret API. Configured keys are preserved. It then checks public account capability flags and records a sanitized, read-only operations audit. Unknown production checks remain explicitly unverified. Follow the [Cloudflare setup guide](docs/self-hosting.md) for the GitHub connection, build-token permission, and email activation. Forks must replace the resource identifiers and domain with their own.
 
 Accounts use Better Auth with database-backed sessions and rate limiting. Requests cannot establish identity by supplying legacy hosting headers. New accounts need only a username and password; save the recovery key because an account without email cannot receive a reset link. Recovery keys are hashed in the database, replaced when used, and never included in library exports. New passwords use a versioned, salted scrypt hash; older hashes remain verifiable until the password changes. Account settings require the current password for sensitive changes and support revoking other sessions. Existing email accounts retain Resend-based confirmation and recovery; production email requires `RESEND_API_KEY` and `AUTH_EMAIL_FROM` with a verified sending domain. Reset links expire after one hour and revoke existing sessions when used. [Enable account email](docs/self-hosting.md#6-enable-account-email).
 
-No required email means pseudonymous accounts, not an untraceable or end-to-end encrypted service. Server operators can access stored account and library data, and hosting infrastructure processes network information. See the in-app `/privacy` page and the [beta readiness assessment](docs/beta-readiness.md) for the remaining release and operational limits.
+Username accounts provide pseudonymity. They do not provide complete anonymity: server operators can access stored account and library data, hosting infrastructure processes network information, and public names or posts can identify a reader. See the in-app `/privacy` page and the [beta readiness assessment](docs/beta-readiness.md) for privacy boundaries and the evidence still needed before wider release.
 
 For changes, read [CONTRIBUTING.md](CONTRIBUTING.md), [architecture](docs/architecture.md), and [CHANGELOG.md](CHANGELOG.md).
 

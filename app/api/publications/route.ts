@@ -1,3 +1,5 @@
+import { getCurrentUser } from '@/app/auth';
+import { noBlockSql, publicContentSql, requireParticipation } from '@/lib/server/moderation';
 import { authenticated, handled, HttpError, json, readJson, sameOrigin } from '@/lib/server/http';
 import { database, getLibrary, type PublicationRow } from '@/lib/server/storage';
 import { idSchema, makePublication } from '@/lib/server/validation';
@@ -11,12 +13,15 @@ export async function GET(request:Request){return handled(async()=>{
   if(cursor){try{const parsed=JSON.parse(atob(cursor));if(Array.isArray(parsed)&&parsed.length===2&&typeof parsed[0]==='string'&&idSchema.safeParse(parsed[1]).success)after=JSON.stringify(parsed);}catch{ /* invalid cursor below */ }
     if(!after)throw new HttpError(400,'Invalid page cursor.');}
   const bound=after?JSON.parse(after) as [string,string]:null;
-  const result=await (bound?database().prepare('SELECT p.*, r.id AS profile_id FROM publications p LEFT JOIN public_profiles r ON r.owner_id = p.owner_id WHERE p.updated_at < ? OR (p.updated_at = ? AND p.id < ?) ORDER BY p.updated_at DESC, p.id DESC LIMIT 25').bind(bound[0],bound[0],bound[1]):database().prepare('SELECT p.*, r.id AS profile_id FROM publications p LEFT JOIN public_profiles r ON r.owner_id = p.owner_id ORDER BY p.updated_at DESC, p.id DESC LIMIT 25')).all<PublicationRow&{profile_id:string|null}>();
+  const viewer=await getCurrentUser();
+  const query=`WITH safety_viewer AS (SELECT ? AS id) SELECT p.*,r.id AS profile_id FROM publications p LEFT JOIN public_profiles r ON r.owner_id=p.owner_id AND ${publicContentSql('profile','r.id','r.owner_id')} WHERE ${publicContentSql('shelf','p.id','p.owner_id')} AND ${noBlockSql('(SELECT id FROM safety_viewer)','p.owner_id')} ${bound?'AND (p.updated_at<? OR (p.updated_at=? AND p.id<?))':''} ORDER BY p.updated_at DESC,p.id DESC LIMIT 25`;
+  const statement=database().prepare(query);
+  const result=await (bound?statement.bind(viewer?.userId??null,bound[0],bound[0],bound[1]):statement.bind(viewer?.userId??null)).all<PublicationRow&{profile_id:string|null}>();
   const rows=result.results.slice(0,24),last=rows[rows.length-1];
   return json({items:rows.map(row=>({...JSON.parse(row.snapshot),...(row.profile_id?{profileId:row.profile_id}:{})})),...(result.results.length>24&&last?{nextCursor:btoa(JSON.stringify([last.updated_at,last.id]))}:{})});
 });}
 export async function POST(request:Request){return handled(async()=>{
-  sameOrigin(request);const user=await authenticated(request);const body=await readJson(request,4096) as {shelfId?:unknown};
+  sameOrigin(request);const user=await authenticated(request);await requireParticipation(user.userId);const body=await readJson(request,4096) as {shelfId?:unknown};
   const parsed=idSchema.safeParse(body?.shelfId);if(!parsed.success)throw new HttpError(400,'Choose a shelf to share.');
   const library=await getLibrary(user.userId);if(!library)throw new HttpError(404,'Save your shelf before sharing it.');
   const state=JSON.parse(library.state) as AppState;const shelf=state.shelves.find(s=>s.id===parsed.data);if(!shelf)throw new HttpError(404,'Shelf not found.');

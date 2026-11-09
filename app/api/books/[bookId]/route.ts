@@ -16,6 +16,6 @@ export async function GET(request: Request, context: { params: Promise<{ bookId:
       ? await lookupCatalogBook(bookId, Number(offsetText))
       : await readCommunityCatalogBook(bookId);
     if (!book) throw new HttpError(404, 'This book was not found in the catalog.');
-    return json({ book }, 200, { 'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' });
+    return json({ book }, 200, { 'Cache-Control': bookId.startsWith('cs_') ? 'no-store' : 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400' });
   });
 }

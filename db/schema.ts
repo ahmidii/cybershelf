@@ -115,6 +115,75 @@ export const accountActionLimits = sqliteTable('account_action_limits', {
   count: integer('count').notNull(),
 }, table => [index('account_action_limits_window_idx').on(table.windowStart)]);
 
+// Upload reservations and cleanup obligations intentionally outlive auth rows.
+// Never cascade them away while R2 may still hold the account's original bytes.
+export const assetTransfers = sqliteTable('asset_transfers', {
+  id: text('id').primaryKey(), ownerId: text('owner_id').notNull(),
+  objectKey: text('object_key').notNull().unique(), size: integer('size').notNull(),
+  state: text('state', { enum: ['uploading', 'cleanup'] }).notNull().default('uploading'),
+  writerDone: integer('writer_done').notNull().default(0),
+  createdAt: integer('created_at').notNull(), updatedAt: integer('updated_at').notNull(),
+  expiresAt: integer('expires_at').notNull(), nextAttemptAt: integer('next_attempt_at').notNull().default(0),
+  attempts: integer('attempts').notNull().default(0), leaseUntil: integer('lease_until').notNull().default(0),
+}, table => [index('asset_transfers_owner_idx').on(table.ownerId), index('asset_transfers_cleanup_idx').on(table.state, table.nextAttemptAt), index('asset_transfers_expiry_idx').on(table.expiresAt)]);
+
+export const accountDeletionJobs = sqliteTable('account_deletion_jobs', {
+  id: text('id').primaryKey(), ownerId: text('owner_id').notNull().unique(),
+  requestedAt: integer('requested_at').notNull(), updatedAt: integer('updated_at').notNull(),
+  nextAttemptAt: integer('next_attempt_at').notNull(), attempts: integer('attempts').notNull().default(0),
+  leaseUntil: integer('lease_until').notNull().default(0),
+}, table => [index('account_deletion_jobs_pending_idx').on(table.nextAttemptAt)]);
+
+// Minimal erasure ledger for reconciling a restore before it can go live.
+// No contact details, names, reasons or content; retained for 35 days.
+export const accountErasureLedger = sqliteTable('account_erasure_ledger', {
+  ownerId: text('owner_id').primaryKey(), requestedAt: integer('requested_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+}, table => [index('account_erasure_ledger_expiry_idx').on(table.expiresAt)]);
+
+export const readerBlocks = sqliteTable('reader_blocks', {
+  id: text('id').notNull().unique(),
+  blockerId: text('blocker_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  blockedOwnerId: text('blocked_owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  blockedProfileId: text('blocked_profile_id'), createdAt: text('created_at').notNull(),
+}, table => [primaryKey({ columns: [table.blockerId, table.blockedOwnerId] }), index('reader_blocks_reverse_idx').on(table.blockedOwnerId)]);
+
+export const moderationReports = sqliteTable('moderation_reports', {
+  id: text('id').primaryKey(),
+  reporterId: text('reporter_id').references(() => user.id, { onDelete: 'set null' }),
+  targetKind: text('target_kind').notNull(), targetId: text('target_id').notNull(),
+  targetOwnerId: text('target_owner_id').references(() => user.id, { onDelete: 'set null' }),
+  reason: text('reason').notNull(), details: text('details').notNull(), publicSnapshot: text('public_snapshot').notNull(),
+  status: text('status', { enum: ['open', 'dismissed', 'actioned'] }).notNull().default('open'),
+  createdAt: text('created_at').notNull(), updatedAt: text('updated_at').notNull(),
+}, table => [uniqueIndex('moderation_reports_reporter_target_idx').on(table.reporterId, table.targetKind, table.targetId), index('moderation_reports_status_date_idx').on(table.status, table.updatedAt, table.id)]);
+
+export const moderationActions = sqliteTable('moderation_actions', {
+  id: text('id').primaryKey(),
+  reportId: text('report_id').references(() => moderationReports.id, { onDelete: 'set null' }),
+  moderatorId: text('moderator_id').references(() => user.id, { onDelete: 'set null' }),
+  targetOwnerId: text('target_owner_id').references(() => user.id, { onDelete: 'set null' }),
+  action: text('action').notNull(), note: text('note').notNull(), createdAt: text('created_at').notNull(),
+}, table => [index('moderation_actions_date_idx').on(table.createdAt), index('moderation_actions_report_date_idx').on(table.reportId, table.createdAt, table.id)]);
+
+export const moderationHidden = sqliteTable('moderation_hidden', {
+  targetKind: text('target_kind').notNull(), targetId: text('target_id').notNull(),
+  ownerId: text('owner_id').references(() => user.id, { onDelete: 'cascade' }),
+  moderatorId: text('moderator_id').references(() => user.id, { onDelete: 'set null' }),
+  createdAt: text('created_at').notNull(),
+}, table => [primaryKey({ columns: [table.targetKind, table.targetId] }), index('moderation_hidden_owner_idx').on(table.ownerId)]);
+
+export const accountSuspensions = sqliteTable('account_suspensions', {
+  userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  reason: text('reason').notNull(), createdAt: text('created_at').notNull(),
+  moderatorId: text('moderator_id').references(() => user.id, { onDelete: 'set null' }),
+});
+
+// Bounded operational checkpoints contain no account credentials or content.
+export const maintenanceState = sqliteTable('maintenance_state', {
+  key: text('key').primaryKey(), value: text('value').notNull(), updatedAt: integer('updated_at').notNull(),
+});
+
 // Follow an account's public identity without exposing its authentication ID.
 // Keeping the last public identifier permits unfollowing an unpublished reader.
 export const follows = sqliteTable('follows', {

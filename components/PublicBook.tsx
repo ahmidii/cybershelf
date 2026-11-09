@@ -1,5 +1,6 @@
 'use client';
 
+import SafetyActions from './SafetyActions';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, BookOpen, CalendarDays, Check, ChevronDown, Globe, Layers3, Library, LoaderCircle, LockKeyhole, Plus, RefreshCw, Star, StarHalf, Trash2, UsersRound } from 'lucide-react';
 import type { Book, BookFormat } from '@/lib/types';
@@ -254,7 +255,7 @@ function BookPage({ id, accountId }: Props) {
           </aside>
           <div className={styles.bookStory}>
             <p className={styles.eyebrow}>{book.source === 'community' ? 'A BOOK IN THE CYBERSHELF COMMUNITY' : 'ONE BOOK, MANY READING LIVES'}</p>
-            <h1 id="book-title">{book.title}</h1>
+            <h1 id="book-title">{book.title}</h1>{book.source==='community'?<SafetyActions kind="book" targetId={book.id}/>:null}
             <p className={styles.author}>by {book.authors.length ? book.authors.join(', ') : book.author}</p>
             {book.firstPublished && <p className={styles.firstPublished}>First published {book.firstPublished}</p>}
             <div className={styles.stats} aria-label="Community reading statistics" aria-busy={statsLoading}>

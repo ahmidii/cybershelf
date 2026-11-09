@@ -4,6 +4,7 @@ import { getOwnProfile } from '@/lib/server/profiles';
 import { activityBook, parseFeedCursor, type ReaderActivityRow } from '@/lib/server/feed';
 import { idSchema } from '@/lib/server/validation';
 import type { ActivityEvent, AppState, PublicBook, PublicProfile } from '@/lib/types';
+import { requireParticipation } from '@/lib/server/moderation';
 
 export const dynamic = 'force-dynamic';
 export async function GET(request: Request) { return handled(async () => {
@@ -22,6 +23,7 @@ export async function GET(request: Request) { return handled(async () => {
 }); }
 export async function POST(request: Request) { return handled(async () => {
   sameOrigin(request); const user = await authenticated(request);
+  await requireParticipation(user.userId);
   const body = await readJson(request, 2048) as { kind?: unknown; bookId?: unknown };
   if (!body || !['purchased', 'added'].includes(String(body.kind)) || !idSchema.safeParse(body.bookId).success) throw new HttpError(400, 'Choose the book and update you want to share.');
   const [profile, library] = await Promise.all([getOwnProfile(user.userId), getLibrary(user.userId)]);

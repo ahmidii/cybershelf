@@ -6,10 +6,11 @@ import { HttpError } from './http';
 import { database, getLibrary } from './storage';
 import { idSchema } from './validation';
 import { readingPostDto, visibleCommentSql, type JoinedReadingPost } from './journal';
+import { noBlockSql, publicContentSql, publicOwnerSql } from './moderation';
 
 const PAGE_SIZE = 20;
 const postProgress = "CAST(json_extract(p.snapshot, '$.entry.progress') AS REAL)";
-const roomMembership = 'p.book_key = ? AND p.owner_id IN (SELECT followed_owner_id FROM follows WHERE follower_id = ? UNION SELECT ?)';
+const roomMembership = `p.book_key = ? AND p.owner_id IN (SELECT followed_owner_id FROM follows WHERE follower_id = ? UNION SELECT ?) AND ${publicContentSql('post','p.id','p.owner_id')} AND ${publicContentSql('profile','r.id','r.owner_id')} AND ${noBlockSql('(SELECT id FROM safety_viewer)','p.owner_id')}`;
 
 export interface ReadingRoomContext {
   ownerId: string;
@@ -28,15 +29,15 @@ export interface ReadingRoomContext {
 export async function indexLegacyReadingPosts() {
   const db = database();
   for (let pass = 0; pass < 6; pass++) {
-    const rows = await db.prepare("SELECT id,updated_at,json_extract(snapshot,'$.book.title') AS title,json_extract(snapshot,'$.book.author') AS author FROM reading_posts WHERE book_key = '' ORDER BY id LIMIT 500")
+    const rows = await db.prepare(`SELECT id,updated_at,json_extract(snapshot,'$.book.title') AS title,json_extract(snapshot,'$.book.author') AS author FROM reading_posts WHERE book_key = '' AND ${publicOwnerSql('reading_posts.owner_id')} ORDER BY id LIMIT 500`)
       .all<{ id: string; updated_at: string; title: string; author: string }>();
     if (!rows.results.length) return;
     const keys = rows.results.map(row => ({ id: row.id, updatedAt: row.updated_at, key: readingBookKey(row) }));
-    await db.prepare("UPDATE reading_posts SET book_key = json_extract(k.value,'$.key') FROM json_each(?) AS k WHERE reading_posts.id = json_extract(k.value,'$.id') AND reading_posts.updated_at = json_extract(k.value,'$.updatedAt') AND reading_posts.book_key = ''")
+    await db.prepare(`UPDATE reading_posts SET book_key = json_extract(k.value,'$.key') FROM json_each(?) AS k WHERE reading_posts.id = json_extract(k.value,'$.id') AND reading_posts.updated_at = json_extract(k.value,'$.updatedAt') AND reading_posts.book_key = '' AND ${publicOwnerSql('reading_posts.owner_id')}`)
       .bind(JSON.stringify(keys)).run();
     if (rows.results.length < 500) return;
   }
-  const remaining = await db.prepare("SELECT 1 AS pending FROM reading_posts WHERE book_key = '' LIMIT 1").first();
+  const remaining = await db.prepare(`SELECT 1 AS pending FROM reading_posts WHERE book_key = '' AND ${publicOwnerSql('reading_posts.owner_id')} LIMIT 1`).first();
   if (remaining) throw new HttpError(503, 'Earlier reading conversations are being prepared. Please try again in a moment.');
 }
 
@@ -89,10 +90,10 @@ export async function readingRoom(ownerId: string, params: URLSearchParams): Pro
     : [cursor.progress, cursor.progress, cursor.date, cursor.date, cursor.id];
   const sort = order === 'newest' ? 'p.published_at DESC,p.id DESC' : `${postProgress} ASC,p.published_at ASC,p.id ASC`;
   const results = await db.batch([
-    db.prepare(`SELECT p.*,r.snapshot AS profile_snapshot,(SELECT COUNT(*) FROM reading_comments c WHERE c.post_id = p.id AND ${visibleCommentSql} AND c.progress <= ?) AS comment_count FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id WHERE ${roomMembership} AND ${postProgress} <= ?${cursorSql} ORDER BY ${sort} LIMIT ?`)
-      .bind(room.reader.progress, ...scope, room.reader.progress, ...cursorBindings, PAGE_SIZE + 1),
-    db.prepare(`SELECT COALESCE(SUM(CASE WHEN ${postProgress} <= ? THEN 1 ELSE 0 END),0) AS visible,COALESCE(SUM(CASE WHEN ${postProgress} > ? THEN 1 ELSE 0 END),0) AS waiting FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id WHERE ${roomMembership}`)
-      .bind(room.reader.progress, room.reader.progress, ...scope),
+    db.prepare(`WITH safety_viewer AS (SELECT ? AS id) SELECT p.*,r.snapshot AS profile_snapshot,(SELECT COUNT(*) FROM reading_comments c WHERE c.post_id = p.id AND ${visibleCommentSql} AND ${noBlockSql('(SELECT id FROM safety_viewer)','c.owner_id')} AND c.progress <= ?) AS comment_count FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id WHERE ${roomMembership} AND ${postProgress} <= ?${cursorSql} ORDER BY ${sort} LIMIT ?`)
+      .bind(ownerId, room.reader.progress, ...scope, room.reader.progress, ...cursorBindings, PAGE_SIZE + 1),
+    db.prepare(`WITH safety_viewer AS (SELECT ? AS id) SELECT COALESCE(SUM(CASE WHEN ${postProgress} <= ? THEN 1 ELSE 0 END),0) AS visible,COALESCE(SUM(CASE WHEN ${postProgress} > ? THEN 1 ELSE 0 END),0) AS waiting FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id WHERE ${roomMembership}`)
+      .bind(ownerId, room.reader.progress, room.reader.progress, ...scope),
     db.prepare('SELECT COUNT(*) AS count FROM follows WHERE follower_id = ?').bind(ownerId),
     db.prepare('SELECT version FROM libraries WHERE owner_id = ?').bind(ownerId),
   ]);
@@ -111,8 +112,8 @@ export async function readingRoom(ownerId: string, params: URLSearchParams): Pro
 export async function readingRoomPost(room: ReadingRoomContext, postId: string): Promise<JoinedReadingPost> {
   if (!idSchema.safeParse(postId).success) throw new HttpError(404, 'This conversation is not available at your bookmark.');
   await indexLegacyReadingPosts();
-  const post = await database().prepare(`SELECT p.*,r.snapshot AS profile_snapshot,0 AS comment_count FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id WHERE p.id = ? AND ${roomMembership} AND ${postProgress} <= ?`)
-    .bind(postId, room.key, room.ownerId, room.ownerId, room.reader.progress).first<JoinedReadingPost>();
+  const post = await database().prepare(`WITH safety_viewer AS (SELECT ? AS id) SELECT p.*,r.snapshot AS profile_snapshot,0 AS comment_count FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id WHERE p.id = ? AND ${roomMembership} AND ${postProgress} <= ?`)
+    .bind(room.ownerId, postId, room.key, room.ownerId, room.ownerId, room.reader.progress).first<JoinedReadingPost>();
   if (!post) throw new HttpError(404, 'This conversation is not available at your bookmark.');
   return post;
 }
@@ -120,12 +121,12 @@ export async function readingRoomPost(room: ReadingRoomContext, postId: string):
 export async function readingRoomComments(room: ReadingRoomContext, post: JoinedReadingPost): Promise<ReadingRoomCommentsResponse> {
   const parentProgress = readingPostDto(post).entry.progress;
   const results = await database().batch([
-    database().prepare(`SELECT c.id,c.owner_id,c.profile_id,c.name,c.body,c.progress,c.created_at FROM reading_comments c WHERE c.post_id = ? AND ${visibleCommentSql} AND c.progress <= ? ORDER BY c.created_at ASC,c.id ASC LIMIT 100`)
-      .bind(post.id, room.reader.progress),
-    database().prepare(`SELECT COUNT(*) AS count FROM reading_comments c WHERE c.post_id = ? AND ${visibleCommentSql} AND c.progress > ?`).bind(post.id, room.reader.progress),
+    database().prepare(`WITH safety_viewer AS (SELECT ? AS id) SELECT c.id,c.owner_id,c.profile_id,c.name,c.body,c.progress,c.created_at FROM reading_comments c WHERE c.post_id = ? AND ${visibleCommentSql} AND ${noBlockSql('(SELECT id FROM safety_viewer)','c.owner_id')} AND c.progress <= ? ORDER BY c.created_at ASC,c.id ASC LIMIT 100`)
+      .bind(room.ownerId, post.id, room.reader.progress),
+    database().prepare(`WITH safety_viewer AS (SELECT ? AS id) SELECT COUNT(*) AS count FROM reading_comments c WHERE c.post_id = ? AND ${visibleCommentSql} AND ${noBlockSql('(SELECT id FROM safety_viewer)','c.owner_id')} AND c.progress > ?`).bind(room.ownerId, post.id, room.reader.progress),
     database().prepare('SELECT version FROM libraries WHERE owner_id = ?').bind(room.ownerId),
-    database().prepare(`SELECT p.id FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id WHERE p.id = ? AND p.updated_at = ? AND ${roomMembership} AND ${postProgress} <= ?`)
-      .bind(post.id, post.updated_at, room.key, room.ownerId, room.ownerId, room.reader.progress),
+    database().prepare(`WITH safety_viewer AS (SELECT ? AS id) SELECT p.id FROM reading_posts p JOIN public_profiles r ON r.id = p.profile_id AND r.owner_id = p.owner_id WHERE p.id = ? AND p.updated_at = ? AND ${roomMembership} AND ${postProgress} <= ?`)
+      .bind(room.ownerId, post.id, post.updated_at, room.key, room.ownerId, room.ownerId, room.reader.progress),
   ]);
   if ((results[2].results[0] as { version?: number } | undefined)?.version !== room.version || !results[3].results.length) throw new HttpError(409, 'This conversation or your bookmark changed. Refresh before continuing.');
   const rows = results[0].results as unknown as { id: string; owner_id: string; profile_id: string | null; name: string; body: string; progress: number; created_at: string }[];

@@ -1,3 +1,5 @@
+import { getCurrentUser } from '@/app/auth';
+import { publicContentSql, viewerCanSee } from '@/lib/server/moderation';
 import { handled,HttpError,json } from '@/lib/server/http';
 import { database } from '@/lib/server/storage';
 import { idSchema } from '@/lib/server/validation';
@@ -7,7 +9,9 @@ export const dynamic='force-dynamic';
 type Context={params:Promise<{id:string}>};
 export async function GET(request:Request,context:Context){return handled(async()=>{
   const {id}=await context.params,db=database();
-  if(!idSchema.safeParse(id).success||!await db.prepare('SELECT id FROM public_profiles WHERE id = ?').bind(id).first())throw new HttpError(404,'This profile is private or no longer shared.');
+  const viewer=await getCurrentUser();
+  const profile=idSchema.safeParse(id).success?await db.prepare(`SELECT owner_id FROM public_profiles p WHERE id=? AND ${publicContentSql('profile','p.id','p.owner_id')}`).bind(id).first<{owner_id:string}>():null;
+  if(!profile||!await viewerCanSee(viewer?.userId,profile.owner_id))throw new HttpError(404,'This profile is private or no longer shared.');
   const cursor=new URL(request.url).searchParams.get('cursor');let after:[string,string]|null=null;
   if(cursor){try{const value=JSON.parse(atob(cursor));if(Array.isArray(value)&&value.length===2&&typeof value[0]==='string'&&Number.isFinite(Date.parse(value[0]))&&idSchema.safeParse(value[1]).success)after=value as [string,string];}catch{/* Invalid cursor below. */}if(!after)throw new HttpError(400,'Invalid journal page cursor.');}
   const statement=after?db.prepare(publicReadingPostSelect+' WHERE p.profile_id = ? AND (p.published_at < ? OR (p.published_at = ? AND p.id < ?)) ORDER BY p.published_at DESC,p.id DESC LIMIT 101').bind(id,after[0],after[0],after[1]):db.prepare(publicReadingPostSelect+' WHERE p.profile_id = ? ORDER BY p.published_at DESC,p.id DESC LIMIT 101').bind(id);

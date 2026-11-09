@@ -1,6 +1,7 @@
 import type { ActivityEvent, Book, PublicBook, Publication } from '../types';
 import { HttpError } from './http';
 import { database } from './storage';
+import { noBlockSql, publicContentSql } from './moderation';
 
 export interface FollowingReader { id: string; name: string; bio: string; unavailable?: boolean; }
 export interface ReaderActivityRow { id: string; owner_id: string; profile_id: string; kind: 'purchased' | 'added'; book_id: string; snapshot: string; created_at: string; }
@@ -24,8 +25,8 @@ export async function followingReaders(ownerId: string): Promise<FollowingReader
     CASE WHEN p.id IS NULL THEN 'Unavailable profile' ELSE json_extract(p.snapshot,'$.name') END AS name,
     CASE WHEN p.id IS NULL THEN '' ELSE json_extract(p.snapshot,'$.bio') END AS bio,
     CASE WHEN p.id IS NULL THEN 1 ELSE 0 END AS unavailable
-    FROM follows f LEFT JOIN public_profiles p ON p.owner_id=f.followed_owner_id
-    WHERE f.follower_id=? ORDER BY f.created_at DESC,f.followed_profile_id DESC LIMIT 500`).bind(ownerId)
+    FROM follows f LEFT JOIN public_profiles p ON p.owner_id=f.followed_owner_id AND ${publicContentSql('profile','p.id','p.owner_id')}
+    WHERE f.follower_id=? AND ${noBlockSql('f.follower_id','f.followed_owner_id')} ORDER BY f.created_at DESC,f.followed_profile_id DESC LIMIT 500`).bind(ownerId)
     .all<{ id: string; name: string; bio: string; unavailable: number }>();
   return rows.results.map(row => ({ id: row.id, name: row.name, bio: row.bio, ...(row.unavailable ? { unavailable: true } : {}) }));
 }
@@ -34,11 +35,11 @@ export async function followingReaders(ownerId: string): Promise<FollowingReader
  * public identities. Reading posts/comments additionally retain their exact
  * published identity, so unpublishing and republishing cannot revive them. */
 export async function followingFeed(ownerId: string, cursor: [string, string] | null) {
-  const query = `WITH followed AS (
+  const query = `WITH safety_viewer AS (SELECT ? AS id), followed AS (
     SELECT p.owner_id,p.id,json_extract(p.snapshot,'$.name') AS name
-    FROM follows f JOIN public_profiles p ON p.owner_id=f.followed_owner_id WHERE f.follower_id=?
+    FROM follows f JOIN public_profiles p ON p.owner_id=f.followed_owner_id WHERE f.follower_id=? AND ${publicContentSql('profile','p.id','p.owner_id')} AND ${noBlockSql('f.follower_id','p.owner_id')}
   ), visible_posts AS (
-    SELECT r.* FROM reading_posts r JOIN public_profiles p ON p.id=r.profile_id AND p.owner_id=r.owner_id
+    SELECT r.* FROM reading_posts r JOIN public_profiles p ON p.id=r.profile_id AND p.owner_id=r.owner_id WHERE ${publicContentSql('profile','p.id','p.owner_id')} AND ${publicContentSql('post','r.id','r.owner_id')} AND ${noBlockSql('(SELECT id FROM safety_viewer)','r.owner_id')}
   ), activity AS (
     SELECT 'reading:'||r.id AS key,r.id,'reading' AS kind,r.updated_at AS created_at,f.id AS actor_id,f.name AS actor_name,
       json_extract(r.snapshot,'$.book') AS book_json,CAST(json_extract(r.snapshot,'$.entry.progress') AS REAL) AS progress,
@@ -48,17 +49,17 @@ export async function followingFeed(ownerId: string, cursor: [string, string] | 
     SELECT 'comment:'||c.id,c.id,'comment',c.created_at,f.id,f.name,
       json_extract(r.snapshot,'$.book'),MAX(CAST(json_extract(r.snapshot,'$.entry.progress') AS REAL),c.progress),
       c.body,r.id,NULL,c.id FROM reading_comments c
-      JOIN followed f ON f.owner_id=c.owner_id AND f.id=c.profile_id JOIN visible_posts r ON r.id=c.post_id
+      JOIN followed f ON f.owner_id=c.owner_id AND f.id=c.profile_id JOIN visible_posts r ON r.id=c.post_id WHERE ${publicContentSql('comment','c.id','c.owner_id')}
     UNION ALL
     SELECT 'shelf:'||p.id,p.id,CASE WHEN p.updated_at>p.published_at THEN 'shelf_updated' ELSE 'shelf' END,p.updated_at,f.id,f.name,
-      NULL,NULL,NULL,NULL,p.snapshot,NULL FROM publications p JOIN followed f ON f.owner_id=p.owner_id
+      NULL,NULL,NULL,NULL,p.snapshot,NULL FROM publications p JOIN followed f ON f.owner_id=p.owner_id WHERE ${publicContentSql('shelf','p.id','p.owner_id')}
     UNION ALL
     SELECT 'activity:'||a.id,a.id,a.kind,a.created_at,f.id,f.name,a.snapshot,NULL,NULL,NULL,NULL,NULL
-      FROM reader_activity a JOIN followed f ON f.owner_id=a.owner_id AND f.id=a.profile_id
+      FROM reader_activity a JOIN followed f ON f.owner_id=a.owner_id AND f.id=a.profile_id WHERE ${publicContentSql('activity','a.id','a.owner_id')}
   ) SELECT * FROM activity ${cursor ? 'WHERE created_at<? OR (created_at=? AND key<?)' : ''}
     ORDER BY created_at DESC,key DESC LIMIT 31`;
   const statement = database().prepare(query);
-  const result = await (cursor ? statement.bind(ownerId, cursor[0], cursor[0], cursor[1]) : statement.bind(ownerId)).all<FeedRow>();
+  const result = await (cursor ? statement.bind(ownerId, ownerId, cursor[0], cursor[0], cursor[1]) : statement.bind(ownerId, ownerId)).all<FeedRow>();
   const rows = result.results.slice(0, 30), last = rows.at(-1);
   const count = await database().prepare('SELECT COUNT(*) AS total FROM follows WHERE follower_id=?').bind(ownerId).first<{ total: number }>();
   return { items: rows.map(activityDTO), followingCount: count?.total ?? 0,

@@ -57,6 +57,13 @@
       "when": 1794224834290,
       "tag": "0007_username_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794229888549,
+      "tag": "0008_public_beta_safety",
+      "breakpoints": true
     }
   ]
 }

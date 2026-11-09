@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ensureAuthSecret } from './ensure-auth-secret.mjs';
+import { ensureBackupBucket } from './ensure-backup-bucket.mjs';
+import { runOperationsAudit } from './verify-cloudflare-operations.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const wrangler = fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js', import.meta.url));
@@ -36,6 +38,9 @@ function run(args) {
 
 // A dry run validates the built upload without logging in or touching D1.
 if (!dryRun) {
+  const backup = await ensureBackupBucket({ config, configPath: generatedConfig });
+  console.log(backup.created ? 'Created the configured private backup bucket with a 30-day expiry policy.'
+    : 'Verified the configured private backup bucket and 30-day expiry policy.');
   // Wrangler records applied migrations; a retry applies only pending files.
   // Stop immediately on migration failure, keeping the previous Worker live.
   run(['d1', 'migrations', 'apply', 'DB', '--remote', '--config', 'wrangler.jsonc']);
@@ -71,6 +76,11 @@ if (!dryRun) {
     throw new Error('The Worker was published, but account configuration is still unavailable. Check runtime BETTER_AUTH_SECRET, DB, and APP_ORIGIN; an existing secret was not replaced.');
   }
   console.log('Live account configuration verified on the application origin.');
+  // Informational evidence after a successful deployment. Unknown dashboard or
+  // restore checks remain unknown; they must not be disguised as passed gates.
+  const operations = await runOperationsAudit({ config, configPath: generatedConfig });
+  console.log('Production operations evidence (read-only; unverified gates still require review):');
+  console.log(JSON.stringify(operations, null, 2));
 }
 
 async function accountsReady(waitForAvailable = false) {
