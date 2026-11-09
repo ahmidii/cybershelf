@@ -159,3 +159,5 @@ Review failed erasure jobs promptly; durable retries prevent a transient bucket 
 - [Worker script-only settings API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/settings/methods/get/)
 
 GitHub references: [Actions notification settings](https://docs.github.com/en/subscriptions-and-notifications/how-tos/managing-github-actions-notifications) and [workflow run notifications](https://docs.github.com/en/actions/concepts/workflows-and-actions/notifications-for-workflow-runs).
+
+The operations endpoint also reports `maintenanceStarted`. A false value means no durable housekeeping claim has been recorded; after a first-run failure it is true while `cleanupHealthy` is false. `maintenanceRecent` becomes true only after a completed run. Allow Cloudflare's documented cron propagation window before treating a never-started schedule as a fault; never treat a configured schedule alone as successful cleanup.

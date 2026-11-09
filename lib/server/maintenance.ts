@@ -7,11 +7,11 @@ const LEASE_MS = 10 * 60 * 1000;
 
 export async function maintenanceStatus(bindings: Bindings, now = Date.now()) {
   const configured = bindings.MAINTENANCE_ENABLED === 'true' && !!bindings.DB && !!bindings.BUCKET;
-  if (!configured) return { configured: false, recent: false, cleanupHealthy: false };
+  if (!configured) return { configured: false, started: false, recent: false, cleanupHealthy: false };
   const saved = await bindings.DB!.prepare('SELECT value FROM maintenance_state WHERE key = ?').bind(KEY).first<{ value: string }>();
   let state: { lastCompletedAt?: number; lastFailureAt?: number } = {};
   try { state = saved ? JSON.parse(saved.value) : {}; } catch { /* Invalid status never passes readiness. */ }
-  const completed = Number(state.lastCompletedAt);
+  const completed = Number(state.lastCompletedAt ?? 0);
   const overdue = await bindings.DB!.prepare(`SELECT 1 AS overdue FROM account_deletion_jobs
     WHERE requested_at < ? OR (attempts > 0 AND lease_until <= ?)
     UNION ALL SELECT 1 FROM asset_transfers WHERE
@@ -19,7 +19,7 @@ export async function maintenanceStatus(bindings: Bindings, now = Date.now()) {
       OR (attempts > 0 AND lease_until <= ?) LIMIT 1`)
     .bind(now - 60 * 60 * 1000, now, now - 60 * 60 * 1000, now - 60 * 60 * 1000, now).first();
   const failedSinceCompletion = Number(state.lastFailureAt ?? 0) > completed;
-  return { configured, recent: Number.isFinite(completed) && completed <= now && completed >= now - 15 * 60 * 1000,
+  return { configured, started: !!saved, recent: Number.isFinite(completed) && completed > 0 && completed <= now && completed >= now - 15 * 60 * 1000,
     cleanupHealthy: !overdue && !failedSinceCompletion };
 }
 

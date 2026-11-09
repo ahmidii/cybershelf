@@ -6,7 +6,7 @@ Updated 2026-11-09. Package version: `0.8.0`.
 
 **This release has passed local acceptance; broader public-beta promotion still requires production evidence.** It includes username accounts and recovery keys together with account deletion, reporting, blocking, moderation, atomic upload reservations, and production recovery/maintenance tooling. The build, regression, built-Worker and migration checks below passed. Confirm the serving deployment and complete the operational gates before describing the service as ready for wider public use.
 
-The previously recorded deployed baseline is 0.7.0, commit `3f8614061dc21a58cf57a4b39d957814cf65d68d`. That historical baseline is not evidence that the new candidate is live. A source push, successful build, or account/email capability flag does not prove deployment completion, email delivery, or operational security.
+The initial 0.8.0 release was deployed from commit `7f35e164501c568d09a02ae1f1d4a7fb916b3999`: Cloudflare Workers Builds reported success and the live health endpoint returned release 0.8.0 with accounts and email configured. The home, username-only signup and privacy pages were observed working. A complete original-file backup scan was observed in production on 2026-11-09. The monitoring follow-up makes first-run cleanup failures visible and exposes whether maintenance has started; its own build check confirms publication. These deployment signals do not establish email inbox delivery or administrator security.
 
 ## Authentication update
 
@@ -33,11 +33,11 @@ The additive migrations are `0007_username_accounts` and `0008_public_beta_safet
 | Regression and account UI tests | 201 passed, zero failed, zero skipped, on 2026-11-09. |
 | Built-Worker integration and all migrations | Passed on 2026-11-09, including healthy multi-batch deletion progress and failed standalone removal monitoring. Disposable D1/R2 and intercepted-mail fixtures cover all nine migrations, account recovery, deletion, moderation/blocks, upload races/failures, actual scheduled handlers and original-file copying/recovery. |
 | Isolated restore rehearsal | Passed using disposable SQLite plus synthetic originals: current credentials and erasures survive rollback; old sessions/reset tokens and public snapshots are removed. Separate D1/R2 recovery fixtures verify original bytes. Live Cloudflare restore remains unverified. |
-| Browser and physical-device behavior | Managed local browser preview unavailable: daemon mailbox missing. Built-Worker page rendering and component checks pass. No physical iPhone/iPad verification is claimed. |
-| Production deployment | Use the Cloudflare Workers Builds check attached to this commit and the live operations endpoint to confirm deployment. Preparing this source is not proof of successful publication. |
+| Browser and physical-device behavior | Live home, username-only signup and privacy pages checked after the initial release. Managed local preview is unavailable because its daemon mailbox is missing. No physical iPhone/iPad verification is claimed. |
+| Production deployment | Initial 0.8.0 deployment confirmed from the successful Cloudflare check and live release response. Verify subsequent monitoring commits from their own Cloudflare checks and health response. |
 | Cloudflare administration and storage audit | Incomplete. The attempted dashboard sign-in returned HTTP 403; inaccessible settings remain unverified. |
 | Real moderator setup and review coverage | Pending a verified Cybershelf account ID and assigned reviewer. There is no automatic first-user promotion. |
-| Production backup/restore and alert delivery | Pending recorded live evidence and a scoped isolated exercise with synthetic data. |
+| Production backup/restore and alert delivery | First complete production original-file scan observed; live isolated restore and notification delivery remain unverified. Local synthetic restoration passed. |
 
 No independent penetration test or blanket security certification is claimed. The repository's automated tests use synthetic fixtures and disposable storage; they are not authorization to inspect real libraries, send account email, or exercise production moderation/deletion.
 

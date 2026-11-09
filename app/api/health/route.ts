@@ -29,6 +29,7 @@ export async function GET(request: Request) {
     return Response.json({ ...capabilities, release: '0.8.0', operations: {
       moderationConfigured: !!moderator,
       maintenanceConfigured: maintenance.configured,
+      maintenanceStarted: maintenance.started,
       maintenanceRecent: maintenance.recent,
       cleanupHealthy: maintenance.cleanupHealthy,
       backupConfigured: backup.configured,
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
     } }, { headers });
   } catch {
     return Response.json({ ...capabilities, release: '0.8.0', operations: {
-      moderationConfigured: false, maintenanceConfigured: false, maintenanceRecent: false,
+      moderationConfigured: false, maintenanceConfigured: false, maintenanceStarted: false, maintenanceRecent: false,
       cleanupHealthy: false, backupConfigured: false, backupRecent: false,
     } }, { status: 503, headers });
   }

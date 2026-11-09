@@ -28,6 +28,7 @@ try {
 }
 const base = 'https://cybershelf.test';
 const accountsOnly = process.argv.includes('--accounts-only');
+const operationsOnly = process.argv.includes('--operations-only');
 function workerModules(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = resolve(directory, entry.name);
@@ -107,7 +108,7 @@ try {
       ...(request.body ? { body: new Uint8Array(await request.arrayBuffer()) } : {}),
     });
   };
-  if (!accountsOnly) {
+  if (!accountsOnly && !operationsOnly) {
   const home = await requestFetch(base + '/');
   assert.equal(home.status, 200, 'Guest home renders in workerd');
   assert.equal(home.headers.get('Referrer-Policy'), 'no-referrer', 'External artwork does not receive the reading page URL');
@@ -139,6 +140,7 @@ try {
   console.log('✓ D1 stores salted password hashes and shared rate-limit counters.');
   }
 
+  if (!operationsOnly) {
   mailFixture = new Miniflare({
     ...baseOptions,
     name: 'cybershelf-account-email-integration',
@@ -176,6 +178,7 @@ try {
   await runAssetTransferIntegration({ base, fetch: mailFetch, database: mailDatabase, bucket: mailBucket, report: message => console.log('✓ ' + message) });
   await runModerationIntegration({ base, fetch: mailFetch, database: mailDatabase, report: message => console.log('✓ ' + message) });
   await runAccountDeletionIntegration({ base, fetch: mailFetch, database: mailDatabase, bucket: mailBucket, authBindings: baseOptions.bindings, report: message => console.log('✓ ' + message) });
+  }
 
   // Recovery scans require isolated, complete originals. Other suites deliberately
   // seed metadata without bytes and must never make a backup silently skip loss.
@@ -197,7 +200,14 @@ try {
   };
   let operations = (await operationsHealth()).operations;
   assert.deepEqual(operations, { moderationConfigured: false, maintenanceConfigured: true,
-    maintenanceRecent: false, cleanupHealthy: true, backupConfigured: true, backupRecent: false });
+    maintenanceStarted: false, maintenanceRecent: false, cleanupHealthy: true, backupConfigured: true, backupRecent: false });
+  await backupDatabase.prepare('INSERT INTO maintenance_state (key,value,updated_at) VALUES (?,?,?)')
+    .bind('housekeeping.v1', JSON.stringify({lastFailureAt:Date.now(),leaseUntil:0}), Date.now()).run();
+  const firstFailure = (await operationsHealth()).operations;
+  assert.equal(firstFailure.maintenanceStarted, true, 'An attempted first run is distinguishable from a missing schedule');
+  assert.equal(firstFailure.maintenanceRecent, false);
+  assert.equal(firstFailure.cleanupHealthy, false, 'A failure before any successful run cannot pass cleanup health');
+  await backupDatabase.prepare("DELETE FROM maintenance_state WHERE key='housekeeping.v1'").run();
   const now = Date.now(), syntheticKey = 'private/as_scheduled_cleanup_fixture';
   await backupDatabase.prepare('INSERT INTO auth_user (id,name,email,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,?)')
     .bind('moderator_fixture', 'Synthetic moderator', 'moderator@example.invalid', 1, now, now).run();
@@ -223,7 +233,7 @@ try {
   assert.deepEqual(new Uint8Array(await streamedCopy.arrayBuffer()), streamedBytes);
   operations = (await operationsHealth()).operations;
   assert.deepEqual(operations, { moderationConfigured: true, maintenanceConfigured: true,
-    maintenanceRecent: true, cleanupHealthy: true, backupConfigured: true, backupRecent: true });
+    maintenanceStarted: true, maintenanceRecent: true, cleanupHealthy: true, backupConfigured: true, backupRecent: true });
   assert.equal(JSON.stringify(operations).includes('moderator_fixture'), false);
   await backupDatabase.prepare("INSERT INTO asset_transfers (id,owner_id,object_key,size,state,writer_done,created_at,updated_at,expires_at,next_attempt_at,attempts,lease_until) VALUES (?,?,?,24,'cleanup',1,?,?,?,?,1,0)")
     .bind('as_failed_removal_fixture', 'moderator_fixture', 'private/as_failed_removal_fixture', now, now, now, now + 60_000).run();
