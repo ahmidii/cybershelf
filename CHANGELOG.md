@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1 — Live decoration delivery — 2026-11-10
+
+- Explicitly bind the packaged static assets as `ASSETS` so canonical catalogue image routes work in the deployed Worker. The integration harness now uses the generated binding instead of supplying an undeclared one, and verifies real WebP bytes and content types for full images and thumbnails.
+- Keep decoration cards at their natural height inside the scrollable picker; cards no longer collapse into thin rows when many results are present.
+- Update the visible release label and align the decoration search input with the API query limit.
+
 ## 0.9.0 — Shared decorations and edition artwork — 2026-11-10
 
 ### Added

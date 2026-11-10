@@ -1,6 +1,6 @@
-# Release status — 0.9.0 shared artwork
+# Release status — 0.9.1 shared artwork
 
-Updated 2026-11-10. Package version: `0.9.0`.
+Updated 2026-11-10. Package version: `0.9.1`.
 
 ## Scope and current evidence
 
@@ -9,6 +9,8 @@ This release adds a searchable set of 100 Kenney/KayKit decorations and a shared
 Local release acceptance passed on 2026-11-10: TypeScript, the production build, all 239 regression cases, the complete built-Worker integration suite, and the nine-case operations rehearsal. Image-orientation hardening is included in those final checks. Confirm the serving deployment from the release commit's Cloudflare check and the live health response; local acceptance alone does not establish publication.
 
 The additive migration is `0009_shared_assets`. The integration suite applies all ten migrations to disposable storage. The existing GitHub-to-Cloudflare workflow applies pending migrations before publishing. This update does not migrate hosting, replace authentication secrets, alter account email setup, or add runtime dependencies. Better Auth and its adapter remain pinned to 1.7.16 under the already approved exact-version dependency-age exceptions.
+
+The first 0.9.0 Cloudflare build succeeded and the live health endpoint reported every existing capability/operations flag as healthy. Live UI inspection then found that the isolated test harness had supplied an `ASSETS` binding missing from production configuration, and that grid rows compressed under their height limit. Version 0.9.1 explicitly configures the binding, makes the harness read it from the built configuration, checks full/thumbnail MIME and bytes, and gives picker rows their natural content height.
 
 ## What is ready in the source
 
@@ -31,7 +33,7 @@ The curated catalogue works without an external search key. A third-party web se
 | Built-Worker integration | Passed with all ten migrations, isolated D1/R2 and intercepted external fixtures. Includes actual cross-account contribution/reuse, curated image routes, verified editions, privacy, moderation, withdrawal, reviewer/account deletion, and backup copy behavior. Repeated successfully against the final production bundle and sanitizer. |
 | Isolated restore rehearsal | Nine operations cases passed, including withdrawn/rejected artwork, retained approved copies after contributor deletion, current hiding/suspension, missing evidence, checksum rollback, and idempotent reconciliation. No live restore was performed. |
 | Visual catalogue review | All 100 rendered objects inspected in contact sheets; transparency and output dimensions checked. Twenty-four real JPEG/PNG/WebP orientation samples independently decoded with identical display results. |
-| Browser and physical-device behavior | Managed local preview is unavailable because its preview relay is missing. Live 0.9.0 interface verification remains pending. No physical iPhone/iPad verification is claimed. |
+| Browser and physical-device behavior | Managed local preview is unavailable because its preview relay is missing. Initial live 0.9.0 verification found a missing production static-asset binding and compressed picker rows. Version 0.9.1 corrects both; verify the final interface after deployment. No physical iPhone/iPad verification is claimed. |
 | Production publication | Confirm the release commit's Cloudflare check and live release response. |
 | Moderator runtime configuration | The live 0.8.0 health endpoint reported moderation configured on 2026-11-10 before this update. Actual reviewer access and staffing are separate operational checks; no account is automatically promoted. |
 | Administrator security, recovery and alerts | Existing operational gates remain unverified where no production evidence was obtained. |

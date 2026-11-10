@@ -4,6 +4,9 @@
   "main": "./worker/index.ts",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
+  // The Vite plugin generates the built asset directory. The Worker also needs
+  // its binding to serve moderated catalogue images through their canonical URL.
+  "assets": { "binding": "ASSETS" },
   "routes": [
     {
       "pattern": "cybershelf.io",

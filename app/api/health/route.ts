@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       WHERE u.id IN (${ids.map(() => '?').join(',')}) AND NOT EXISTS
       (SELECT 1 FROM account_suspensions s WHERE s.user_id=u.id) LIMIT 1`).bind(...ids).first() : null;
     const [maintenance, backup] = await Promise.all([maintenanceStatus(env), originalBackupStatus(env)]);
-    return Response.json({ ...capabilities, release: '0.9.0', operations: {
+    return Response.json({ ...capabilities, release: '0.9.1', operations: {
       moderationConfigured: !!moderator,
       maintenanceConfigured: maintenance.configured,
       maintenanceStarted: maintenance.started,
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       backupRecent: backup.state === 'current',
     } }, { headers });
   } catch {
-    return Response.json({ ...capabilities, release: '0.9.0', operations: {
+    return Response.json({ ...capabilities, release: '0.9.1', operations: {
       moderationConfigured: false, maintenanceConfigured: false, maintenanceStarted: false, maintenanceRecent: false,
       cleanupHealthy: false, backupConfigured: false, backupRecent: false,
     } }, { status: 503, headers });

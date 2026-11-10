@@ -27,6 +27,10 @@ try {
 } catch {
   throw new Error('Build cybershelf before this check: pnpm build && pnpm test:worker');
 }
+assert.equal(config.assets?.binding, 'ASSETS',
+  'The built deployment must declare assets.binding="ASSETS" so canonical catalogue images work in production. Set it in wrangler.jsonc and rebuild; the test must not invent a missing binding.');
+assert.equal(typeof config.assets?.directory, 'string',
+  'The Cloudflare Vite build must generate the deployment asset directory.');
 const base = 'https://cybershelf.test';
 const accountsOnly = process.argv.includes('--accounts-only');
 const operationsOnly = process.argv.includes('--operations-only');
@@ -56,7 +60,7 @@ const baseOptions = {
   // No d1Persist/r2Persist, credentials, resource IDs, or remote bindings.
   assets: {
     directory: resolve(buildDir, config.assets.directory),
-    binding: 'ASSETS',
+    binding: config.assets.binding,
     routerConfig: { has_user_worker: true },
   },
   outboundService: () => new WorkerResponse('External network access is disabled in this test.', { status: 502 }),

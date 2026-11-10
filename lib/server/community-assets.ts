@@ -268,6 +268,12 @@ export async function sharedAssetImageResponse(id: string, request: Request, vie
     const response = await staticAssets.fetch(new URL(path, request.url));
     if (!response.ok) throw new HttpError(404, 'This shared image is unavailable.');
     const mime = path.endsWith('.png') ? 'image/png' : 'image/webp';
+    // Do not relabel an HTML fallback or a misconfigured asset response as an
+    // image: a successful status alone does not prove the file was served.
+    if (response.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase() !== mime) {
+      void response.body?.cancel();
+      throw new HttpError(503, 'The decoration collection is temporarily unavailable.');
+    }
     return new Response(response.body, { headers: { ...headers, 'Content-Type': mime, 'Content-Disposition': 'inline; filename="cybershelf-decoration.' + (mime === 'image/png' ? 'png' : 'webp') + '"' } });
   }
   const row = await database().prepare('SELECT * FROM community_assets WHERE id=?').bind(id).first<CommunityAssetRow>();
