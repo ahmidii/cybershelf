@@ -30,12 +30,12 @@ const ownerValues = (ownerId: string) => [ownerId, ownerId, ownerId];
 
 export async function assetUsage(bindings: AssetBindings, ownerId: string) {
   const row = await database(bindings).prepare(`SELECT
-    (SELECT COALESCE(SUM(size),0) FROM assets WHERE owner_id = ?) AS committed_bytes,
-    (SELECT COUNT(*) FROM assets WHERE owner_id = ?) AS committed_count,
+    (SELECT COALESCE(SUM(size),0) FROM assets WHERE owner_id = ?) + (SELECT COALESCE(SUM(size),0) FROM community_assets WHERE contributor_id = ? AND status IN ('pending','approved')) AS committed_bytes,
+    (SELECT COUNT(*) FROM assets WHERE owner_id = ?) + (SELECT COUNT(*) FROM community_assets WHERE contributor_id = ? AND status IN ('pending','approved')) AS committed_count,
     (SELECT COALESCE(SUM(size),0) FROM asset_transfers WHERE owner_id = ?) AS pending_bytes,
     (SELECT COUNT(*) FROM asset_transfers WHERE owner_id = ?) AS pending_count,
     (SELECT COUNT(*) FROM asset_transfers WHERE owner_id = ? AND state = 'uploading') AS uploading`)
-    .bind(ownerId, ownerId, ownerId, ownerId, ownerId)
+    .bind(ownerId, ownerId, ownerId, ownerId, ownerId, ownerId, ownerId)
     .first<{ committed_bytes: number; committed_count: number; pending_bytes: number; pending_count: number; uploading: number }>();
   if (!row) throw new AssetTransferError(503, 'File storage is temporarily unavailable.', 'STORAGE_UNAVAILABLE');
   return { usedBytes: row.committed_bytes + row.pending_bytes, usedCount: row.committed_count + row.pending_count,
@@ -82,11 +82,11 @@ export async function reserveAssetTransfer(bindings: AssetBindings, ownerId: str
   const result = await db.prepare(`INSERT INTO asset_transfers
       (id, owner_id, object_key, size, state, writer_done, created_at, updated_at, expires_at, next_attempt_at, attempts, lease_until)
     SELECT ?, ?, ?, ?, 'uploading', 0, ?, ?, ?, 0, 0, 0 WHERE ${ACTIVE_OWNER}
-      AND (SELECT COALESCE(SUM(size),0) FROM assets WHERE owner_id = ?) + (SELECT COALESCE(SUM(size),0) FROM asset_transfers WHERE owner_id = ?) + ? <= ?
-      AND (SELECT COUNT(*) FROM assets WHERE owner_id = ?) + (SELECT COUNT(*) FROM asset_transfers WHERE owner_id = ?) < ?
+      AND (SELECT COALESCE(SUM(size),0) FROM assets WHERE owner_id = ?) + (SELECT COALESCE(SUM(size),0) FROM asset_transfers WHERE owner_id = ?) + (SELECT COALESCE(SUM(size),0) FROM community_assets WHERE contributor_id = ? AND status IN ('pending','approved')) + ? <= ?
+      AND (SELECT COUNT(*) FROM assets WHERE owner_id = ?) + (SELECT COUNT(*) FROM asset_transfers WHERE owner_id = ?) + (SELECT COUNT(*) FROM community_assets WHERE contributor_id = ? AND status IN ('pending','approved')) < ?
       AND (SELECT COUNT(*) FROM asset_transfers WHERE owner_id = ? AND state = 'uploading') < ?
     RETURNING *`).bind(id, ownerId, objectKey, size, now, now, now + UPLOAD_RESERVATION_MS,
-      ...ownerValues(ownerId), ownerId, ownerId, size, ACCOUNT_ASSET_LIMIT_BYTES, ownerId, ownerId, ACCOUNT_ASSET_LIMIT_COUNT, ownerId, ACCOUNT_UPLOAD_IN_FLIGHT_LIMIT)
+      ...ownerValues(ownerId), ownerId, ownerId, ownerId, size, ACCOUNT_ASSET_LIMIT_BYTES, ownerId, ownerId, ownerId, ACCOUNT_ASSET_LIMIT_COUNT, ownerId, ACCOUNT_UPLOAD_IN_FLIGHT_LIMIT)
     .first<AssetTransfer>();
   if (result) return result;
   const active = await db.prepare(`SELECT 1 AS active WHERE ${ACTIVE_OWNER}`).bind(...ownerValues(ownerId)).first();
@@ -116,7 +116,8 @@ export async function finishAssetTransfer(bindings: AssetBindings, transfer: Ass
 export async function abandonAssetTransfer(bindings: AssetBindings, transfer: AssetTransfer, writerDone: boolean, now = Date.now()) {
   await database(bindings).prepare(`UPDATE asset_transfers SET state = 'cleanup', writer_done = MAX(writer_done, ?),
     updated_at = ?, next_attempt_at = ? WHERE id = ? AND owner_id = ?
-    AND NOT EXISTS (SELECT 1 FROM assets WHERE id = asset_transfers.id AND object_key = asset_transfers.object_key)`)
+    AND NOT EXISTS (SELECT 1 FROM assets WHERE id = asset_transfers.id AND object_key = asset_transfers.object_key)
+    AND NOT EXISTS (SELECT 1 FROM community_assets WHERE storage_id = asset_transfers.id AND object_key = asset_transfers.object_key AND status IN ('pending','approved'))`)
     .bind(writerDone ? 1 : 0, now, now, transfer.id, transfer.owner_id).run();
 }
 
@@ -186,7 +187,8 @@ export async function cleanupAssetTransfers(bindings: AssetBindings,
     const lease = now + 120_000;
     const row = await db.prepare(`UPDATE asset_transfers SET state = 'cleanup', lease_until = ?, attempts = MIN(attempts + 1, 1000000), updated_at = ?
       WHERE id = ? AND ${predicate}
-      AND NOT EXISTS (SELECT 1 FROM assets WHERE id = asset_transfers.id AND object_key = asset_transfers.object_key) RETURNING *`)
+      AND NOT EXISTS (SELECT 1 FROM assets WHERE id = asset_transfers.id AND object_key = asset_transfers.object_key)
+      AND NOT EXISTS (SELECT 1 FROM community_assets WHERE storage_id = asset_transfers.id AND object_key = asset_transfers.object_key AND status IN ('pending','approved')) RETURNING *`)
       .bind(lease, now, candidate.id, now, now, now).first<AssetTransfer>();
     if (!row) continue;
     try {

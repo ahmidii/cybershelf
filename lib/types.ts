@@ -30,6 +30,10 @@ export interface Book {
   catalogId?: string; editionId?: string;
   isbn?: string; description?: string; pages?: number; currentPage?: number;
   format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string;
+  /** Shared artwork has an independent, revocable catalogue identity. Legacy
+   * spine URLs remain personal choices unless the reader enables automatic art. */
+  spineAssetId?: string; coverAssetId?: string;
+  spineMode?: 'auto' | 'custom' | 'typographic';
   readingLog?: ReadingLogEntry[];
   status: ReadingStatus; progress: number; rating: number | null;
   review: string; notes: string; addedAt: string; finishedAt?: string;
@@ -46,6 +50,7 @@ export interface ShelfPlacement { row: number; x: number; supportId?: string; }
 export interface ShelfItem {
   id: string; kind: 'book' | 'decor'; bookId?: string; decor?: DecorKind;
   assetId?: string; imageUrl?: string; label?: string;
+  sharedAssetId?: string; decorWidthMm?: number; decorHeightMm?: number; decorFlip?: boolean;
   slot: number | null; pinned: boolean; facing: 'auto' | 'spine' | 'cover' | 'stack';
   lean?: 'auto' | 'upright' | 'left' | 'right';
   placement?: ShelfPlacement;
@@ -59,7 +64,7 @@ export interface Profile { name: string; bio: string; featuredShelfId?: string; 
 export interface AppState { schemaVersion: 1; profile: Profile; books: Book[]; shelves: Shelf[]; connections?: LibraryConnection[]; }
 export interface StateResponse { state: AppState | null; version: number; user: { id: string; name: string }; }
 export interface Asset { id: string; filename: string; mime: string; size: number; url: string; }
-export interface PublicBook { id: string; title: string; author: string; coverUrl: string; color: string; catalogId?: string; editionId?: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string; }
+export interface PublicBook { id: string; title: string; author: string; coverUrl: string; color: string; catalogId?: string; editionId?: string; pages?: number; format?: BookFormat; dimensions?: BookDimensions; spineUrl?: string; spineAssetId?: string; coverAssetId?: string; }
 export interface Publication {
   id: string; shelf: Shelf; books: PublicBook[]; name: string;
   publishedAt: string; bookCount: number; profileId?: string;

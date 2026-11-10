@@ -7,6 +7,9 @@ import { pageCountPatch } from '@/lib/reading-progress';
 import { SPINE_IMAGE_TYPES, SPINE_PHOTO_MAX_BYTES, spineCopyIdentity, validSpineImage } from '@/lib/spine-image';
 import { ACCOUNT_ID_HEADER } from '@/lib/auth-contract';
 import SpinePhotoEditor from './SpinePhotoEditor';
+import EditionArtwork from './EditionArtwork';
+import { usesAutomaticSpine } from '@/lib/community-artwork';
+import { sharedAssetIdFromUrl } from '@/lib/shared-assets';
 import styles from './BookAppearance.module.css';
 
 type SpinePhoto = { file: File; copy: string; accountId: string; key: number };
@@ -85,14 +88,14 @@ export default function BookAppearance({ book, onChange, accountId }: { book: Bo
       const data = await response.json() as Asset & { error?: string };
       if (!response.ok) throw new Error(data.error || 'Could not save this spine image.');
       if (!sameCopy()) throw new Error('The selected copy changed. Its spine was left unchanged.');
-      change({ spineUrl: assetUrl(data.id) }); setPhoto(null);
+      change({ spineUrl: assetUrl(data.id), spineAssetId: undefined, spineMode: 'custom' }); setPhoto(null);
       setNote('Your spine is ready for upright, leaning, and stacked books. It stays private until you share a shelf, profile, or reading update that uses it.');
     } finally { if (live.current) setUploading(false); }
   };
   const saveSpineLink = () => {
     const value = spine.trim();
     if (!value || !validSpineImage(value)) { setError('Use a complete http:// or https:// image URL without sign-in details.'); return; }
-    change({ spineUrl: value }); setSpine(value); setError(''); setPhoto(null);
+    change({ spineUrl: value, spineAssetId: sharedAssetIdFromUrl(value), spineMode: 'custom' }); setSpine(value); setError(''); setPhoto(null);
     setNote('Spine image linked to this copy. Check the preview to make sure it matches your edition.');
   };
   const sourceLabel = size.source === 'manual' ? 'Custom size' : size.source === 'catalog' ? 'Catalog measurements' : 'Estimated size';
@@ -105,7 +108,7 @@ export default function BookAppearance({ book, onChange, accountId }: { book: Bo
           {hasSpine ? <img src={book.spineUrl} alt={`Spine of ${book.title}`} draggable={false} onError={() => setFailedUrl(book.spineUrl ?? '')}/> : <span><strong>{book.title}</strong><small>{book.author}</small></span>}
         </div>
         <div className={styles.spineCopy}>
-          <span className={styles.spineBadge}>{hasSpine ? 'Your spine image' : 'Typographic spine'}</span>
+          <span className={styles.spineBadge}>{hasSpine ? book.spineAssetId ? 'Community spine' : 'Your spine image' : 'Typographic spine'}</span>
           <h4>The spine on your shelf</h4>
           <p>{hasSpine ? 'This artwork follows your copy when you stand it, lean it, or stack it.' : 'Match your edition with a photo of its spine. Frame it here and preview it before saving.'}</p>
           <span className={styles.editionLabel}>{isbn ? `ISBN ${isbn}` : book.editionId ? `Edition ${book.editionId}` : 'Your copy · add its ISBN above to identify the edition'}</span>
@@ -113,7 +116,8 @@ export default function BookAppearance({ book, onChange, accountId }: { book: Bo
             <label className={`button secondary small ${uploading ? 'disabled' : ''}`}><ImagePlus size={15}/>{hasSpine ? 'Replace photo' : 'Choose photo'}<input type="file" className="sr-only" aria-label="Choose a spine photo" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={event => { selectPhoto(event.target.files?.[0]); event.target.value = ''; }}/></label>
             <label className={`button quiet small ${uploading ? 'disabled' : ''}`}><Camera size={15}/>Take photo<input type="file" className="sr-only" aria-label="Take a spine photo" accept="image/png,image/jpeg,image/webp" capture="environment" disabled={uploading} onChange={event => { selectPhoto(event.target.files?.[0]); event.target.value = ''; }}/></label>
           </div> : <p className={styles.signInHint}>Sign in to save a spine photo, or use an image link below.</p>}
-          {book.spineUrl && <button type="button" className={styles.removeSpine} disabled={uploading} onClick={() => { change({ spineUrl: undefined }); setSpine(''); setError(''); setNote('Using a typographic spine for this copy.'); }}>Use a typographic spine</button>}
+          {book.spineUrl && <button type="button" className={styles.removeSpine} disabled={uploading} onClick={() => { change({ spineUrl: undefined, spineAssetId: undefined, spineMode: 'typographic' }); setSpine(''); setError(''); setNote('Using a typographic spine for this copy.'); }}>Use a typographic spine</button>}
+          {!usesAutomaticSpine(book) && <button type="button" className={styles.removeSpine} disabled={uploading} onClick={() => { change({ spineUrl: undefined, spineAssetId: undefined, spineMode: 'auto' }); setSpine(''); setError(''); setNote('Approved artwork will appear automatically when there is one matching spine for this edition.'); window.dispatchEvent(new CustomEvent('cybershelf:community-artwork')); }}>Use automatic community artwork</button>}
         </div>
       </div>
       {book.spineUrl && !hasSpine && <p className="notice error" role="status">This spine image could not be loaded. Your shelf will use the typographic spine until you replace it.</p>}
@@ -123,8 +127,9 @@ export default function BookAppearance({ book, onChange, accountId }: { book: Bo
         <div><label className="field">Spine image URL<input type="url" maxLength={2048} value={spine} disabled={uploading} placeholder="https://…" onChange={event => setSpine(event.target.value)}/></label><button type="button" className="button secondary small" disabled={uploading || !spine.trim()} onClick={saveSpineLink}>Use image</button></div>
         <p className={styles.hint}>Choose an upright, tightly cropped spine from your edition. Front-cover images don’t show the spine.</p>
       </details>
-      <p className={styles.spineSourceNote}>Catalogs supply front covers, but a matching spine isn’t always available. Until you add one, the title, author, and color form a typographic spine.</p>
+      <p className={styles.spineSourceNote}>A single approved community spine can appear automatically for your edition. When artwork is unavailable, the title, author, and color form a typographic spine. Your own image and selected variants stay yours to choose.</p>
     </section>
+    <EditionArtwork book={book} onChange={onChange} accountId={accountId}/>
     <details className={styles.appearance}>
       <summary><Ruler size={19}/><span><strong>Size & edition details</strong><small>{(size.heightMm / 10).toFixed(1)} × {(size.widthMm / 10).toFixed(1)} × {(size.thicknessMm / 10).toFixed(1)} cm · {sourceLabel}</small></span><ChevronDown size={17}/></summary>
       <div className={styles.body}>

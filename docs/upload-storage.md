@@ -4,7 +4,7 @@ The public-beta upload protocol keeps a durable D1 record before an object can b
 
 ## Storage accounting
 
-An account can hold at most 500 MiB or 1,000 files, with at most four upload reservations active at once. A single conditional D1 statement checks committed assets plus reservations and pending cleanup, then reserves the new file's bytes and count. Concurrent requests cannot each spend the same remaining allowance.
+An account can hold at most 500 MiB or 1,000 files, with at most four upload reservations active at once. A single conditional D1 statement checks private assets, active contributed image copies, reservations, and pending cleanup, then reserves the new file's bytes and count. Concurrent requests cannot each spend the same remaining allowance. Contributing an image creates an independent copy and therefore consumes additional quota; the bundled CC0 catalogue does not consume a reader's quota.
 
 Finalization inserts the asset record and removes its reservation in one D1 batch. The statement rechecks that the account exists, has no deletion job or active suspension, and still owns a valid, unexpired reservation. A storage failure preserves the reservation or turns it into a cleanup obligation; it never silently frees quota while original bytes may remain in the bucket.
 
@@ -14,7 +14,7 @@ Deleting an unreferenced file atomically queues its cleanup before removing the 
 
 - Book originals remain limited to 25 MiB; artwork remains limited to 4 MiB.
 - Multipart input is bounded to 26 MiB, including its overhead, and has a 120-second read deadline. A slow or cancelled body is stopped without keeping the parser occupied indefinitely.
-- One multipart parse/full-file buffer runs per Worker isolate, with at most four waiting requests and a 15-second queue wait. This avoids holding several large full-file buffers within a Worker's memory limit.
+- One multipart parse/full-file buffer runs per Worker isolate, with at most four waiting requests and a 15-second queue wait. Shared contribution image preparation uses the same limiter. This avoids holding several large full-file buffers within a Worker's memory limit.
 - Upload attempts are limited durably before body parsing: 30 per minute / 300 per hour per account and 90 per minute / 900 per hour per source address. Counter keys are HMAC digests rather than raw account identifiers or IP addresses.
 - Reservations expire after ten minutes. A scheduled, bounded retry handles expired transfers and failed cleanup. Retry delays back off to at most one hour.
 
@@ -33,6 +33,8 @@ R2's documented conditional writes and strong consistency underpin this behavior
 Account deletion moves committed asset keys into `asset_transfers` with a confirmed-writer flag and marks existing reservations for cleanup. Auth and public/private account records can then be removed in the same database transaction without losing the object keys needed for erasure. `cleanupAssetTransfers({ DB, BUCKET }, { ownerId?, limit? })` processes bounded work. Failed cleanup remains in the table, without file content, for a later retry. The account deletion job remains pending until the account's transfer records have cleared.
 
 The helper logs only fixed operational failure messages. It does not print filenames, file contents, credentials, account names, or object keys. Operations monitoring should watch for repeated `cybershelf asset cleanup deferred` and `cybershelf upload cleanup deferred` events, along with growing pending-job counts, and investigate the underlying binding, permission, or storage availability issue.
+
+Shared asset withdrawal/rejection queues the independent copied object for the same durable cleanup while adding a 35-day `community_asset_erasures` record. Its private source stays intact. Account deletion erases private and unapproved copies, but approved, explicitly permitted contributions may remain after their contributor relationship is removed. Their public credit and existing moderation restrictions remain. The contribution form and deletion review disclose this distinction. Restoration must reconcile both account and asset erasures before recovering bytes; see [shared artwork](shared-assets.md).
 
 ## First-rollout limitation
 

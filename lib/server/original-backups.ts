@@ -48,6 +48,15 @@ function checkpoint(value: string): OriginalBackupCheckpoint {
 const activeAsset = `EXISTS (SELECT 1 FROM auth_user u WHERE u.id = a.owner_id)
   AND NOT EXISTS (SELECT 1 FROM account_deletion_jobs d WHERE d.owner_id = a.owner_id)
   AND NOT EXISTS (SELECT 1 FROM account_erasure_ledger e WHERE e.owner_id = a.owner_id)`;
+// Shared copies retain their opaque storage IDs after contributor deletion.
+// A catalogue withdrawal has an independent erasure ledger and must never be
+// restored merely because the original contributor no longer has an account.
+const backupSources = `SELECT a.id,a.object_key,a.size,a.mime,a.created_at FROM assets a WHERE ${activeAsset}
+  UNION ALL SELECT c.storage_id AS id,c.object_key,c.size,c.mime,c.created_at FROM community_assets c
+  WHERE c.status IN ('pending','approved') AND NOT EXISTS (SELECT 1 FROM community_asset_erasures e WHERE e.asset_id=c.id)
+    AND (c.status='approved' OR (EXISTS (SELECT 1 FROM auth_user u WHERE u.id=c.contributor_id)
+      AND NOT EXISTS (SELECT 1 FROM account_deletion_jobs d WHERE d.owner_id=c.contributor_id)
+      AND NOT EXISTS (SELECT 1 FROM account_erasure_ledger e WHERE e.owner_id=c.contributor_id)))`;
 
 function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number) {
   return value === undefined ? fallback : Number.isFinite(value) ? Math.min(maximum, Math.max(minimum, Math.floor(value))) : fallback;
@@ -114,8 +123,8 @@ export async function backupOriginalAssets(bindings: OriginalBackupBindings,
       .bind(leaseValue, now(), ORIGINAL_BACKUP_STATE_KEY, encoded).run();
     if (lease.meta.changes !== 1) return result('busy');
     state = leased; encoded = leaseValue; ownsLease = true;
-    const rows = await db.prepare(`SELECT a.id,a.object_key,a.size,a.mime FROM assets a
-      WHERE a.id > ? AND a.created_at <= ? AND ${activeAsset} ORDER BY a.id LIMIT ?`)
+    const rows = await db.prepare(`SELECT a.id,a.object_key,a.size,a.mime FROM (${backupSources}) a
+      WHERE a.id > ? AND a.created_at <= ? ORDER BY a.id LIMIT ?`)
       .bind(state.cursor ?? '', new Date(started).toISOString(), limit + 1).all<BackupAsset>();
     let processed = 0;
     for (const asset of rows.results.slice(0, limit)) {
@@ -125,7 +134,7 @@ export async function backupOriginalAssets(bindings: OriginalBackupBindings,
       const original = await withinDeadline(sourceBucket.get(asset.object_key), deadline);
       // A deletion between the scan and GET is normal. A live metadata record
       // without matching bytes is an actionable failure, never a successful backup.
-      const current = await db.prepare(`SELECT a.id FROM assets a WHERE a.id = ? AND a.object_key = ? AND a.size = ? AND ${activeAsset}`)
+      const current = await db.prepare(`SELECT a.id FROM (${backupSources}) a WHERE a.id = ? AND a.object_key = ? AND a.size = ?`)
         .bind(asset.id, asset.object_key, asset.size).first();
       if (!current) {
         if (original) void original.body.cancel().catch(() => {});

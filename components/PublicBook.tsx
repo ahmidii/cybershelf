@@ -10,7 +10,7 @@ import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { normalizeBookISBN } from '@/lib/book-size';
 import { readingBookKey } from '@/lib/reading';
 import { pageCountPatch } from '@/lib/reading-progress';
-import { canonicalISBN, spineEditionChanged } from '@/lib/spine-image';
+import { canonicalISBN, clearEditionArtwork, spineEditionChanged } from '@/lib/spine-image';
 import type { CatalogBook, CatalogEdition } from '@/lib/book-catalog';
 import { isCommunityReadDate, type BookCommunityMutationResponse, type BookCommunityResponse, type BookCommunityStats, type MyBookCommunity } from '@/lib/book-community';
 import BrandMark from './BrandMark';
@@ -175,10 +175,10 @@ function BookPage({ id, accountId }: Props) {
             if (copy.id !== existing.id) return copy;
             const next = {
               ...copy, catalogId: book.id,
-              ...(edition ? { editionId: edition.editionId, ...(edition.isbn ? { isbn: edition.isbn } : {}), ...(edition.pages ? pageCountPatch(copy, edition.pages) : {}), ...(format ? { format } : {}), coverUrl: edition.coverUrl || copy.coverUrl || book.coverUrl, ...(copy.dimensions?.source === 'estimated' ? { dimensions: undefined } : {}) } : {}),
+              ...(edition ? { editionId: edition.editionId, ...(edition.isbn ? { isbn: edition.isbn } : {}), ...(edition.pages ? pageCountPatch(copy, edition.pages) : {}), ...(format ? { format } : {}), coverUrl: copy.coverAssetId ? copy.coverUrl : edition.coverUrl || copy.coverUrl || book.coverUrl, ...(copy.dimensions?.source === 'estimated' ? { dimensions: undefined } : {}) } : {}),
             };
             return spineEditionChanged(copy, next)
-              ? { ...next, spineUrl: undefined, currentPage: undefined, progress: copy.progress, status: copy.status, finishedAt: copy.finishedAt }
+              ? { ...next, ...clearEditionArtwork(next), currentPage: undefined, progress: copy.progress, status: copy.status, finishedAt: copy.finishedAt }
               : next;
           }) };
         }

@@ -2,8 +2,9 @@ import { env } from 'cloudflare:workers';
 import { HttpError } from './http';
 import { database } from './storage';
 import { createAuth } from './auth';
+import { DECOR_CATALOGUE } from '../decor-catalogue';
 
-export const REPORT_KINDS = ['profile', 'shelf', 'post', 'comment', 'activity', 'book'] as const;
+export const REPORT_KINDS = ['profile', 'shelf', 'post', 'comment', 'activity', 'book', 'asset'] as const;
 export const REPORT_REASONS = ['harassment', 'hate', 'sexual', 'violence', 'spam', 'privacy', 'copyright', 'other'] as const;
 export type ReportKind = typeof REPORT_KINDS[number];
 export interface SafetyTarget { kind: ReportKind; id: string; ownerId: string | null; profileId: string | null; snapshot: Record<string, string>; }
@@ -79,6 +80,17 @@ export async function resolveSafetyTarget(kind: ReportKind, id: string, includeH
   } else if (kind === 'activity') {
     const row = await db.prepare(`SELECT a.owner_id,a.profile_id,a.kind,a.snapshot,p.snapshot AS profile_snapshot FROM reader_activity a JOIN public_profiles p ON p.id=a.profile_id AND p.owner_id=a.owner_id WHERE a.id=? AND ${visible('activity', 'a.id', 'a.owner_id')} AND ${visible('profile', 'p.id', 'p.owner_id')}`).bind(id).first<{ owner_id: string; profile_id: string; kind: string; snapshot: string; profile_snapshot: string }>();
     if (row) { const book = parsed(row.snapshot); target = { kind, id, ownerId: row.owner_id, profileId: row.profile_id, snapshot: { name: text(parsed(row.profile_snapshot).name, 80), title: text(book.title, 300), body: row.kind === 'purchased' ? 'Shared a book purchase' : 'Shared a library addition', url: '/u/' + row.profile_id } }; }
+  } else if (kind === 'asset') {
+    const row = await db.prepare(`SELECT contributor_id,metadata,status FROM community_assets a WHERE id=? AND status='approved' AND ${visible('asset', 'a.id')}
+      ${includeHidden ? '' : 'AND NOT EXISTS (SELECT 1 FROM account_suspensions s WHERE s.user_id=a.contributor_id)'}
+      AND NOT EXISTS (SELECT 1 FROM community_asset_erasures e WHERE e.asset_id=a.id)`).bind(id).first<{ contributor_id: string | null; metadata: string; status: string }>();
+    if (row) { const data = parsed(row.metadata); target = { kind, id, ownerId: row.contributor_id, profileId: null,
+      snapshot: { title: text(data.title, 150), name: text(data.creator, 100), body: text(data.description), url: '/api/community-assets/' + id + '/image' } }; }
+    if (!target) {
+      const asset = DECOR_CATALOGUE.find(item => item.id === id);
+      const hidden = asset && !includeHidden ? await db.prepare("SELECT 1 FROM moderation_hidden WHERE target_kind='asset' AND target_id=?").bind(id).first() : null;
+      if (asset && !hidden) target = { kind, id, ownerId: null, profileId: null, snapshot: { title: asset.title, name: asset.creator, body: asset.description, url: '/api/community-assets/' + id + '/image' } };
+    }
   } else if (kind === 'book' && /^cs_[a-f0-9]{64}$/.test(id)) {
     const row = await db.prepare(`SELECT title,author FROM community_books b WHERE b.id=? AND ${visible('book', 'b.id')}`).bind(id).first<{ title: string; author: string }>();
     if (row) target = { kind, id, ownerId: null, profileId: null, snapshot: { title: text(row.title, 300), name: text(row.author, 300), url: '/books/' + id } };
@@ -132,7 +144,7 @@ export async function moderateReport(moderatorId: string, reportId: string, acti
   if (!report) throw new HttpError(404, 'This report is no longer available.');
   if ((action === 'suspend' || action === 'unsuspend') && (!report.target_owner_id || report.target_owner_id === moderatorId || configuredModerator(report.target_owner_id))) throw new HttpError(400, 'This account cannot be suspended through this report.');
   const now = new Date().toISOString(), statements: D1PreparedStatement[] = [];
-  if (action === 'hide') statements.push(db.prepare('INSERT INTO moderation_hidden (target_kind,target_id,owner_id,moderator_id,created_at) VALUES (?,?,?,?,?) ON CONFLICT(target_kind,target_id) DO NOTHING').bind(report.target_kind, report.target_id, report.target_owner_id, moderatorId, now));
+  if (action === 'hide') statements.push(db.prepare('INSERT INTO moderation_hidden (target_kind,target_id,owner_id,moderator_id,created_at) VALUES (?,?,?,?,?) ON CONFLICT(target_kind,target_id) DO NOTHING').bind(report.target_kind, report.target_id, report.target_kind === 'asset' ? null : report.target_owner_id, moderatorId, now));
   if (action === 'restore') statements.push(db.prepare('DELETE FROM moderation_hidden WHERE target_kind=? AND target_id=?').bind(report.target_kind, report.target_id));
   if (action === 'suspend') statements.push(db.prepare('INSERT INTO account_suspensions (user_id,reason,moderator_id,created_at) VALUES (?,?,?,?) ON CONFLICT(user_id) DO NOTHING').bind(report.target_owner_id, 'Public participation is paused after a moderation review.', moderatorId, now));
   if (action === 'unsuspend') statements.push(db.prepare('DELETE FROM account_suspensions WHERE user_id=?').bind(report.target_owner_id));

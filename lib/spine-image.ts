@@ -7,7 +7,7 @@ export const SPINE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp
 
 export function validSpineImage(value: string): boolean {
   if (!value) return true;
-  if (/^\/api\/assets\/[A-Za-z0-9_-]{1,100}$/.test(value) || /^\/api\/(?:publications|profiles|journal)\/[A-Za-z0-9_-]{1,100}\/assets\/[A-Za-z0-9_-]{1,100}$/.test(value)) return true;
+  if (/^\/api\/assets\/[A-Za-z0-9_-]{1,100}$/.test(value) || /^\/api\/(?:publications|profiles|journal)\/[A-Za-z0-9_-]{1,100}\/assets\/[A-Za-z0-9_-]{1,100}$/.test(value) || /^\/api\/community-assets\/[A-Za-z0-9_-]{1,100}\/image$/.test(value)) return true;
   if (value.length > 2048 || /[\x00-\x20\x7f]/.test(value)) return false;
   try {
     const url = new URL(value);
@@ -32,6 +32,16 @@ export function spineEditionChanged(previous: EditionIdentity, next: EditionIden
   if (previousISBN && nextISBN && previousISBN !== nextISBN) return true;
   if (previous.editionId && next.editionId && previous.editionId !== next.editionId) return true;
   return !!(previous.catalogId && next.catalogId && previous.catalogId !== next.catalogId);
+}
+
+/** A different physical edition cannot inherit the prior edition's artwork.
+ * Keep a newly supplied provider cover, but drop a prior shared cover URL. */
+export function clearEditionArtwork(book: Pick<Book, 'coverUrl' | 'coverAssetId' | 'spineMode'>): Partial<Book> {
+  return {
+    spineUrl: undefined, spineAssetId: undefined, coverAssetId: undefined,
+    spineMode: book.spineMode === 'typographic' ? 'typographic' : 'auto',
+    ...(book.coverAssetId && book.coverUrl === `/api/community-assets/${book.coverAssetId}/image` ? { coverUrl: '' } : {}),
+  };
 }
 
 /** Captured before asynchronous image work so an upload cannot land on a

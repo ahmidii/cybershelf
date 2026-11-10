@@ -4,7 +4,7 @@ import { Flag, ShieldMinus } from 'lucide-react';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { Modal } from './Dialogs';
 import styles from './Safety.module.css';
-type Kind = 'profile' | 'shelf' | 'post' | 'comment' | 'activity' | 'book';
+type Kind = 'profile' | 'shelf' | 'post' | 'comment' | 'activity' | 'book' | 'asset';
 type Context = { accountId: string; canReport: boolean; canBlock: boolean };
 const reasons = [['harassment','Harassment or bullying'],['hate','Hateful content'],['sexual','Sexual content'],['violence','Threats or violence'],['spam','Spam or misleading activity'],['privacy','Personal information or privacy'],['copyright','Copyright concern'],['other','Something else']];
 export default function SafetyActions({ kind, targetId }: { kind: Kind; targetId: string }) {

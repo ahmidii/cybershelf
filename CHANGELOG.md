@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.0 — Shared decorations and edition artwork — 2026-11-10
+
+### Added
+
+- A searchable decoration picker with 100 transparent, consistently rendered CC0 objects from seven official Kenney/KayKit packs. Categories, creator/source/license details, sensible initial sizes, resize, flip, and the existing direct shelf placement controls work together.
+- One shared catalogue for decorations, spines, and covers. Community submissions persist their metadata and edition links in D1 and copy their image bytes into independent R2 storage, preserving private originals.
+- Explicit contribution permission, ownership and source checks, private pending submissions, moderator approval/rejection, contributor withdrawal, a **My contributions** page, and shared-asset reporting through the existing moderation system.
+- Edition-aware shared artwork resolution, equivalent ISBN-10/13 matching, alternate-printing choices, opt-in automatic spines, and preservation of personal artwork. Contradictory identities and title-only matches never borrow a spine.
+- Creator and license details on shared shelf/profile items, reusable shared decorations when copying a shelf, and portable shared references and appearance preferences in supported JSON/CSV exports.
+- Original-file backup coverage for independent contributed images, including approved copies retained after contributor deletion, and current shared-asset revocation reconciliation in the restore runbook/rehearsal.
+
+### Integrity and privacy
+
+- Personal uploads and public shelf snapshots do not automatically grant community reuse. Approved contributions have a separately disclosed retention policy; pending/private uploads are erased with the account, while approved contributions may remain with public credit and without an account link. Withdrawal revokes their shared serving routes immediately and queues durable byte erasure.
+- Shared-copy validation strips identifying image metadata, bounds raster size, rejects animation, and retains only safe reconstructed orientation information when needed for phone photos. Private originals are unchanged.
+- Atomic quota accounting includes active contributed copies, reservations, and pending cleanup. Repeated equivalent submissions are idempotent; daily and pending contribution limits bound review load.
+- Image serving rechecks current approval, revocation, hiding, suspension, and blocking after storage access. Async artwork lookup cannot overwrite a newer selection, and incomplete lookup results cannot revoke an existing image.
+- Nested dialogs keep focus and Escape handling in the topmost layer, including item credits and contribution forms opened from book controls.
+
+### Operating requirements
+
+- No new runtime dependency, external search API key, account connection, or hosting migration is required. Additive migration `0009_shared_assets` runs through the existing GitHub-to-Cloudflare deployment.
+- Configure actual account IDs in `MODERATOR_USER_IDS` to review contributions. Until a moderator approves a submission it remains private; the 100 bundled items work immediately. This release does not provide moderation staffing or verify the outstanding administrator, backup-restore, and alert-delivery gates.
+- The starter search covers the curated collection and approved contributions. It is not live web search. Source files, license notices, provenance hashes, and regeneration instructions are included in the repository.
+
 ## 0.8.0 — Accounts, safety, and public-beta preparation — 2026-11-09
 
 ### Added

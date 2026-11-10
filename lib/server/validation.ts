@@ -11,7 +11,8 @@ const url = z.string().max(2048).refine(v => {
   try { const u = new URL(v); return ['http:', 'https:'].includes(u.protocol) && !u.username && !u.password; } catch { return false; }
 }, 'Use a complete http or https URL');
 const publicImagePath = /^\/api\/(?:publications|profiles|journal)\/[A-Za-z0-9_-]+\/assets\/[A-Za-z0-9_-]+$/;
-const imageUrl = z.string().max(2048).refine(v => !v || /^\/api\/assets\/[A-Za-z0-9_-]+$/.test(v) || publicImagePath.test(v) || url.safeParse(v).success, 'Invalid image URL');
+const sharedImagePath = /^\/api\/community-assets\/[A-Za-z0-9_-]{1,100}\/image$/;
+const imageUrl = z.string().max(2048).refine(v => !v || /^\/api\/assets\/[A-Za-z0-9_-]+$/.test(v) || publicImagePath.test(v) || sharedImagePath.test(v) || url.safeParse(v).success, 'Invalid image URL');
 
 const source = z.object({
   id: idSchema, kind: z.enum(['file', 'platform', 'physical', 'link']), label: text(150),
@@ -29,6 +30,7 @@ const book = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/), isbn: text(32).optional(), description: text(10000).optional(),
   pages: z.number().int().min(0).max(100000).optional(), currentPage: z.number().int().min(0).max(100000).optional(), status: z.enum(['unread','reading','read','paused','dnf']),
   format: z.enum(['paperback','hardcover','pocket','large']).optional(), spineUrl: imageUrl.optional(),
+  spineAssetId: idSchema.optional(), coverAssetId: idSchema.optional(), spineMode: z.enum(['auto','custom','typographic']).optional(),
   dimensions: z.object({heightMm:z.number().min(100).max(500),widthMm:z.number().min(60).max(400),thicknessMm:z.number().min(2).max(150),source:z.enum(['estimated','catalog','manual'])}).optional(),
   readingLog:z.array(readingLogEntry).max(200).optional(),
   progress: z.number().min(0).max(100), rating: z.number().min(0).max(5).nullable(),
@@ -36,10 +38,14 @@ const book = z.object({
   connections:z.array(bookConnection).max(20).optional(),
 }).superRefine((book,ctx)=>{
   if(book.editionId&&!book.catalogId?.startsWith('OL'))ctx.addIssue({code:z.ZodIssueCode.custom,message:'A selected edition needs its Open Library work.',path:['editionId']});
+  for(const [assetKey,imageKey] of [['spineAssetId','spineUrl'],['coverAssetId','coverUrl']] as const){
+    if(book[assetKey]&&book[imageKey]!==`/api/community-assets/${book[assetKey]}/image`)ctx.addIssue({code:z.ZodIssueCode.custom,message:'Shared artwork must use its catalogue image.',path:[imageKey]});
+  }
 });
 const item = z.object({
   id:idSchema, kind:z.enum(['book','decor']), bookId:idSchema.optional(), decor:z.enum(['plant','bear','robot','vase','bookend','image']).optional(),
   assetId:idSchema.optional(), imageUrl:imageUrl.optional(), label:text(150).optional(), slot:z.number().int().min(0).max(1000).nullable(),
+  sharedAssetId:idSchema.optional(), decorWidthMm:z.number().finite().min(5).max(350).optional(), decorHeightMm:z.number().finite().min(10).max(280).optional(), decorFlip:z.boolean().optional(),
   pinned:z.boolean(), facing:z.enum(['auto','spine','cover','stack']),
   lean:z.enum(['auto','upright','left','right']).optional(),
   placement:z.object({row:z.number().int().min(0).max(3),x:z.number().finite().min(0).max(1),supportId:idSchema.optional()}).optional(),
@@ -83,6 +89,7 @@ export const stateSchema = z.object({
       if (i.kind === 'book' && (!i.bookId || !books.has(i.bookId))) ctx.addIssue({code:z.ZodIssueCode.custom,message:'A shelf references a missing book'});
       if (i.kind === 'decor' && !i.decor) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Decoration type is missing'});
       if (i.kind === 'decor' && i.decor === 'image' && !i.assetId && !i.imageUrl) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Decoration image is missing'});
+      if (i.sharedAssetId && (i.kind!=='decor'||i.decor!=='image'||i.assetId||i.imageUrl!==`/api/community-assets/${i.sharedAssetId}/image`)) ctx.addIssue({code:z.ZodIssueCode.custom,message:'A shared decoration must use its catalogue image.'});
       if (i.slot !== null) {
         if ((!i.placement && i.slot >= shelfCapacity(s)) || slots.has(i.slot)) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Two objects occupy a position, or a legacy position is outside this shelf'});
         slots.add(i.slot);
@@ -119,13 +126,15 @@ function publicArtwork(value:string,id:string,imageIds:Set<string>,surface:Share
   const privateId=privateImageId(value),collection=surface==='profile'?'profiles':surface==='journal'?'journal':'publications';
   if(privateId)return imageIds.has(privateId)?`/api/${collection}/${id}/assets/${privateId}`:'';
   try{if(new URL(value).pathname.startsWith('/api/assets/'))return '';}catch{/* Relative public artwork is allowed below. */}
-  return publicImagePath.test(value)||url.safeParse(value).success?value:'';
+  return publicImagePath.test(value)||sharedImagePath.test(value)||url.safeParse(value).success?value:'';
 }
 function publicBook(book:Book,id:string,imageIds:Set<string>,surface:ShareSurface){
   return {id:book.id,title:book.title,author:book.author,coverUrl:publicArtwork(book.coverUrl,id,imageIds,surface),color:book.color,
     ...(book.catalogId?{catalogId:book.catalogId}:{}),...(book.editionId?{editionId:book.editionId}:{}),
     ...(book.pages===undefined?{}:{pages:book.pages}),...(book.format?{format:book.format}:{}),
     ...(book.spineUrl?{spineUrl:publicArtwork(book.spineUrl,id,imageIds,surface)}:{}),
+    ...(book.spineAssetId&&book.spineUrl===`/api/community-assets/${book.spineAssetId}/image`?{spineAssetId:book.spineAssetId}:{}),
+    ...(book.coverAssetId&&book.coverUrl===`/api/community-assets/${book.coverAssetId}/image`?{coverAssetId:book.coverAssetId}:{}),
     ...(book.dimensions?{dimensions:{heightMm:book.dimensions.heightMm,widthMm:book.dimensions.widthMm,thicknessMm:book.dimensions.thicknessMm,source:book.dimensions.source}}:{})};
 }
 
@@ -149,6 +158,8 @@ export function makePublication(state:AppState, shelfId:string, id:string, publi
     if(i.kind==='book') return {id:i.id,kind:'book' as const,bookId:i.bookId,slot:i.slot,pinned:i.pinned,facing:i.facing,...(i.lean?{lean:i.lean}:{}),...placement};
     const imageId=i.assetId??privateImageId(i.imageUrl)??undefined;
     return {id:i.id,kind:'decor' as const,decor:i.decor,slot:i.slot,pinned:i.pinned,facing:i.facing,label:i.label,...placement,
+      ...(i.sharedAssetId?{sharedAssetId:i.sharedAssetId}:{}),
+      ...(i.decorWidthMm===undefined?{}:{decorWidthMm:i.decorWidthMm}),...(i.decorHeightMm===undefined?{}:{decorHeightMm:i.decorHeightMm}),...(i.decorFlip===undefined?{}:{decorFlip:i.decorFlip}),
       ...(imageId && imageIds.has(imageId) ? {imageUrl:`/api/${surface==='profile'?'profiles':'publications'}/${id}/assets/${imageId}`} : i.imageUrl ? {imageUrl:publicImage(i.imageUrl)} : {})};
   });
   return {id,name:state.profile.name,books,bookCount:books.length,publishedAt,shelf:{

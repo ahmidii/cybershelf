@@ -4,7 +4,7 @@ import { bookColor } from './import';
 import { normalizeBookISBN } from './book-size';
 import { readingBookKey } from './reading';
 import { pageCountPatch } from './reading-progress';
-import { spineEditionChanged } from './spine-image';
+import { clearEditionArtwork, spineEditionChanged } from './spine-image';
 
 export interface RemoteBook {
   remoteId: string; title: string; author: string; coverUrl: string; url: string;
@@ -107,7 +107,7 @@ export function syncConnection(state: AppState, connection: LibraryConnection, i
     if (existing && spineEditionChanged(existing, book)) {
       // An image and a numbered page describe one physical edition. Retain
       // reading history, but never carry that artwork/bookmark to a new ISBN.
-      book.spineUrl = undefined; book.currentPage = undefined;
+      Object.assign(book, clearEditionArtwork(book)); book.currentPage = undefined;
       book.catalogId = undefined; book.editionId = undefined;
       book.progress = existing.progress; book.status = existing.status; book.finishedAt = existing.finishedAt;
       if (book.dimensions?.source !== 'manual') book.dimensions = undefined;
@@ -133,7 +133,7 @@ export function syncConnection(state: AppState, connection: LibraryConnection, i
     // resume an unchanged bookmark while still detecting edits made meanwhile.
     // Optional fields cleared by reconciliation must also round-trip through
     // JSON backups, which omit undefined object properties.
-    for (const key of ['currentPage', 'spineUrl', 'catalogId', 'editionId', 'dimensions', 'finishedAt'] as const) {
+    for (const key of ['currentPage', 'spineUrl', 'spineAssetId', 'coverAssetId', 'catalogId', 'editionId', 'dimensions', 'finishedAt'] as const) {
       if (book[key] === undefined) delete book[key];
     }
     const sourceId = previous?.sourceId ?? uid('src_');

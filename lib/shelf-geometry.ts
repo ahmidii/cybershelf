@@ -35,7 +35,12 @@ export function facingForItem(item: ShelfItem, shelf: Pick<Shelf, 'layout'>): Bo
 export function decorSize(item: ShelfItem): { width: number; height: number } {
   const sizes = { plant: [120, 185], bear: [120, 145], robot: [100, 150], vase: [88, 165], bookend: [48, 105], image: [130, 170] };
   const [width, height] = sizes[item.decor ?? 'image'];
-  return { width, height };
+  // The same footprint drives packing, drag previews and final rendering.
+  // Guard browser drafts as well as server-validated libraries.
+  return {
+    width: typeof item.decorWidthMm === 'number' && Number.isFinite(item.decorWidthMm) ? Math.max(5, Math.min(350, item.decorWidthMm)) : width,
+    height: typeof item.decorHeightMm === 'number' && Number.isFinite(item.decorHeightMm) ? Math.max(10, Math.min(280, item.decorHeightMm)) : height,
+  };
 }
 
 function buildUnits(items: ShelfItem[], shelf: Shelf, books: Map<string, VisibleBook>, rowHeight: number): Unit[] {

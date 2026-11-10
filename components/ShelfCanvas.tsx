@@ -4,6 +4,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSP
 import { createPortal } from 'react-dom';
 import { assetUrl, type Book, type PublicBook, type Shelf, type ShelfItem } from '../lib/types';
 import { bookDimensions } from '../lib/book-size';
+import { sharedAssetImageUrl } from '../lib/shared-assets';
 import { facingForItem, layoutShelf, type BookFacing, type PlacedShelfObject } from '../lib/shelf-geometry';
 import { placeShelfItem, type PlacementMode } from '../lib/shelf-placement';
 import DecorArt from './DecorArt';
@@ -27,6 +28,7 @@ export interface ShelfCanvasProps {
   /** Kept for consumers upgrading from the old slot-based canvas. */
   onMove?: (itemId: string, slot: number | null) => void;
   onBookOpen?: (bookId: string) => void;
+  onDecorOpen?: (item: ShelfItem) => void;
   externalDrag?: ExternalShelfDrag | null;
   onExternalDragEnd?: () => void;
   compact?: boolean;
@@ -103,7 +105,14 @@ function BookObject({ book, facing, ratio }: { book: Book | PublicBook; facing: 
   </span>;
 }
 
-export default function ShelfCanvas({ shelf, books, editing = false, selectedId = null, onSelect, onDeselect, onPlace, onBookOpen, externalDrag = null, onExternalDragEnd, compact = false }: ShelfCanvasProps) {
+function ImageDecoration({ item }: { item: ShelfItem }) {
+  const src = item.sharedAssetId ? sharedAssetImageUrl(item.sharedAssetId) : item.imageUrl || (item.assetId ? assetUrl(item.assetId) : '');
+  const [failed, setFailed] = useState('');
+  return !src || failed === src ? <span className={styles.unavailableDecor} aria-label="Decoration image unavailable"><svg viewBox="0 0 40 50" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M13 34h14l-2 12H15Z"/><path d="M20 34V12m0 10c-10 0-14-7-11-13 8 0 13 6 11 13Zm0 7c9 0 14-6 11-12-7 0-12 5-11 12Z"/></svg><small>Unavailable</small></span>
+    : <img className={styles.customDecor} src={src} alt="" draggable={false} onError={() => setFailed(src)} />;
+}
+
+export default function ShelfCanvas({ shelf, books, editing = false, selectedId = null, onSelect, onDeselect, onPlace, onBookOpen, onDecorOpen, externalDrag = null, onExternalDragEnd, compact = false }: ShelfCanvasProps) {
   const geometry = useMemo(() => layoutShelf(shelf, books), [shelf, books]);
   const bookMap = useMemo(() => new Map(books.map(book => [book.id, book])), [books]);
   const itemMap = useMemo(() => new Map(shelf.items.map(item => [item.id, item])), [shelf.items]);
@@ -127,8 +136,8 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   const suppressClickUntil = useRef(0);
   const suppressControlClickUntil = useRef(0);
   const wheel = useRef({ total: 0, at: 0, eventAt: 0, direction: 0 });
-  const latest = useRef({ shelf, books, geometry, selectedId, selected, interactive, editing, onSelect, onDeselect, onPlace, onBookOpen, onExternalDragEnd, mode, touchInput });
-  latest.current = { shelf, books, geometry, selectedId, selected, interactive, editing, onSelect, onDeselect, onPlace, onBookOpen, onExternalDragEnd, mode, touchInput };
+  const latest = useRef({ shelf, books, geometry, selectedId, selected, interactive, editing, onSelect, onDeselect, onPlace, onBookOpen, onDecorOpen, onExternalDragEnd, mode, touchInput });
+  latest.current = { shelf, books, geometry, selectedId, selected, interactive, editing, onSelect, onDeselect, onPlace, onBookOpen, onDecorOpen, onExternalDragEnd, mode, touchInput };
 
   const markInput = (pointerType: string) => {
     const touch = pointerType === 'touch';
@@ -338,7 +347,9 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
       const item = latest.current.shelf.items.find(value => value.id === session.itemId);
       if (!item) return;
       setDismissedId(null);
-      if (latest.current.editing || session.external || item.kind === 'decor') latest.current.onSelect?.(item.id);
+      if (latest.current.editing || session.external) latest.current.onSelect?.(item.id);
+      else if (item.kind === 'decor' && latest.current.onDecorOpen) latest.current.onDecorOpen(item);
+      else if (item.kind === 'decor') latest.current.onSelect?.(item.id);
       else if (item.bookId) latest.current.onBookOpen?.(item.bookId);
     }
   };
@@ -502,6 +513,7 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
     if (performance.now() < suppressClickUntil.current) return;
     if (editing && interactive) { setDismissedId(null); onSelect?.(item.id); }
     else if (item.bookId) onBookOpen?.(item.bookId);
+    else if (item.kind === 'decor' && onDecorOpen) onDecorOpen(item);
     else if (interactive) { setDismissedId(null); onSelect?.(item.id); }
   };
   const keyObject = (event: ReactKeyboardEvent<HTMLButtonElement>, item: ShelfItem) => {
@@ -534,8 +546,7 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
   const renderArtwork = (item: ShelfItem, object: PlacedShelfObject) => {
     const book = item.kind === 'book' ? bookMap.get(item.bookId ?? '') : undefined;
     return book ? <BookObject book={book} facing={object.facing as BookFacing} ratio={object.width / object.height} />
-      : item.kind === 'decor' ? item.decor === 'image' ? <img className={styles.customDecor} src={item.imageUrl || (item.assetId ? assetUrl(item.assetId) : '')} alt="" draggable={false} />
-        : <DecorArt kind={item.decor || 'bookend'} className={styles.decorArt} />
+      : item.kind === 'decor' ? <span className={styles.decorFrame} style={{ transform: item.decorFlip ? 'scaleX(-1)' : undefined }}>{item.decor === 'image' ? <ImageDecoration item={item} /> : <DecorArt kind={item.decor || 'bookend'} className={styles.decorArt} />}</span>
       : <span className={styles.missing}>Book unavailable</span>;
   };
   const placementStyle = (object: PlacedShelfObject): CSSProperties => ({
@@ -565,7 +576,7 @@ export default function ShelfCanvas({ shelf, books, editing = false, selectedId 
     return <button type="button" key={item.id} data-shelf-item={item.id} data-facing={object.facing} data-placement-ghost={isGhost || undefined}
       ref={node => { if (node) objectRefs.current.set(item.id, node); else objectRefs.current.delete(item.id); }}
       className={`${styles.item} ${isSelected && !isGhost ? styles.selected : ''} ${isGhost ? styles.ghost : ''} ${isGhost && !view.result?.valid ? styles.blocked : ''} ${item.kind === 'decor' ? styles.decoration : ''}`}
-      style={placementStyle(object)} disabled={compact || (!interactive && !book)} draggable={false}
+      style={placementStyle(object)} disabled={compact || (!interactive && !book && !(onDecorOpen && item.sharedAssetId))} draggable={false}
       onPointerDown={event => pressObject(event, item)} onDragStart={event => event.preventDefault()} onContextMenu={event => { if (interactive) event.preventDefault(); }}
       onClick={() => activateObject(item)} onKeyDown={event => keyObject(event, item)}
       aria-keyshortcuts={interactive ? 'Space ArrowLeft ArrowRight ArrowUp ArrowDown R Enter Escape' : undefined}

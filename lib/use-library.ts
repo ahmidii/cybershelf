@@ -4,6 +4,7 @@ import { AppState, StateResponse, emptyState, newShelf } from './types';
 import { createDemoState } from './demo';
 import { ACCOUNT_ID_HEADER } from './auth-contract';
 import { adoptBrowserDraft, BROWSER_DRAFT_KEY, canRestoreBrowserDraft, removeSavedBrowserDraft } from './browser-draft';
+import { useCommunityArtwork } from './use-community-artwork';
 
 const ACCOUNT_CHANGED_MESSAGE='Your account changed. Export this draft if needed, then reload to open the current account.';
 export type SaveStatus='loading'|'demo'|'local'|'saving'|'saved'|'error'|'conflict';
@@ -49,6 +50,7 @@ export function useLibrary(accountId:string|null) {
   const update=useCallback((next:AppState|((current:AppState)=>AppState))=>{
     if(!readyRef.current)return;
     const value=typeof next==='function'?next(stateRef.current):next;
+    if(value===stateRef.current)return;
     stateRef.current=value;setState(value);dirty.current=true;
     if(!accountId){try{localStorage.setItem(BROWSER_DRAFT_KEY,JSON.stringify(value));setStatus('local');}catch{setStatus('error');setError('This browser could not save your draft. Export a backup before closing.');}}
   },[accountId]);
@@ -114,5 +116,6 @@ export function useLibrary(accountId:string|null) {
   // Use only after the server confirms sign-out, including explicit discard.
   // Until then the unsaved draft remains available to export or retry.
   const finishSignOut=()=>{dirty.current=false;blocked.current=true;readyRef.current=false;importedDraft.current=null;};
+  useCommunityArtwork({state,update,accountId,ready:ready&&!accountChanged&&status!=='conflict'&&status!=='error'});
   return {state,update,flush,status,error,ready,reload:load,hasDraft,restoreDraft,restoringDraft,canRestoreDraft:canRestoreBrowserDraft(state),finishSignOut,accountChanged};
 }

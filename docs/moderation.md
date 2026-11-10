@@ -2,7 +2,7 @@
 
 ## Reader controls
 
-Readers can report public profiles, shelves, reading updates, replies, explicit book announcements, and manually created community book pages. The server resolves the target from the public record. A request cannot choose the accused account or substitute its own evidence. The queue contains a bounded excerpt of the public item and up to 2,000 characters supplied by the reporter, not private library records or original files.
+Readers can report public profiles, shelves, reading updates, replies, explicit book announcements, manually created community book pages, and shared artwork. The server resolves the target from the public record. A request cannot choose the accused account or substitute its own evidence. The queue contains a bounded excerpt of the public item and up to 2,000 characters supplied by the reporter, not private library records or original files.
 
 Reports require a signed-in account and use durable per-account limits: five attempts per minute and 25 per day. One reader has one report per target. Repeating an open report does not create another queue entry or overwrite the original explanation. A resolved report may be reopened after a day. These controls limit spam; they do not automatically decide whether content should be removed.
 
@@ -46,7 +46,15 @@ Hiding one publication is a scoped action. If someone repeatedly deletes and rep
 
 ## Privacy and operating responsibilities
 
-Report details and moderation notes are visible only to configured moderators. They may contain personal information volunteered by a reporter, so do not copy them to public issues or third-party chats. The service operator can access stored records; this is not end-to-end encrypted reporting.
+### Review shared artwork
+
+The `/moderation` page also lists pending decorations, spines, and covers. Review the submitted image, creator credit, source, permission, and edition/printing before approving. Book artwork can be correctly linked to a catalogue edition yet still show the wrong physical printing; metadata verification does not replace image review. Self-approval is refused. Approval, rejection, and withdrawal require a recent moderator sign-in and an audit note.
+
+Pending contributions are available only to their contributor and authorized moderators. Approval makes the separate image copy reusable; rejection and withdrawal revoke its serving route and queue byte cleanup. A report can hide an approved contribution while preserving a reviewable record. Restoring a hiding flag cannot undo an independent withdrawal. Curated items can also be withheld without changing their source license.
+
+Contribution decision notes are visible to the contributor and configured moderators; ordinary report explanations remain private to moderators. Do not put reporter identities or unrelated private information into a contributor-visible note. Account deletion removes reviewer-authored audit text and the corresponding current review note where applicable. Approved contributions may survive contributor deletion with the account relationship detached, but existing hiding/suspension restrictions remain effective. See [shared artwork](shared-assets.md).
+
+Report details and report-moderation notes are visible only to configured moderators. They may contain personal information volunteered by a reporter, so do not copy them to public issues or third-party chats. The service operator can access stored records; this is not end-to-end encrypted reporting.
 
 Account deletion erases associated reports, captured excerpts, and related audit text, in addition to removing blocks, hiding markers, and suspension records. Reports and decisions are otherwise retained until explicitly removed; this release does not promise an automatic retention deadline. Backups follow the operator's separately documented retention and restoration procedure.
 

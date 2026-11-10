@@ -41,6 +41,7 @@ export async function runHousekeeping(bindings: Bindings, now = Date.now()) {
     const transfers = await cleanupAssetTransfers(bindings, { limit: 2, now });
     await db.batch([
       db.prepare('DELETE FROM account_erasure_ledger WHERE expires_at <= ?').bind(now),
+      db.prepare('DELETE FROM community_asset_erasures WHERE expires_at <= ?').bind(now),
       db.prepare('DELETE FROM account_action_limits WHERE window_start < ?').bind(now - 48 * 60 * 60 * 1000),
       db.prepare('DELETE FROM auth_rate_limit WHERE last_request < ?').bind(now - 48 * 60 * 60 * 1000),
     ]);

@@ -1,7 +1,7 @@
 'use client';
 
 import SafetyActions from './SafetyActions';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import ShelfCanvas from './ShelfCanvas';
 import BrandMark from './BrandMark';
 import BrandWordmark from './BrandWordmark';
@@ -10,10 +10,12 @@ import styles from './PublicShelf.module.css';
 import { ACCOUNT_ID_HEADER, signInPath } from '@/lib/auth-contract';
 import { copyShelfItems } from '@/lib/shelf-actions';
 import { normalizeCatalogId } from '@/lib/book-catalog';
+import CommunityAssetDetails from './CommunityAssetDetails';
+import { Modal } from './Dialogs';
 
 class SignInRequired extends Error {}
 const sameBook=(book:Book,other:PublicBook)=>!(book.catalogId&&other.catalogId&&book.catalogId!==other.catalogId)&&!(book.editionId&&other.editionId&&book.editionId!==other.editionId)&&book.title.trim().toLocaleLowerCase()===other.title.trim().toLocaleLowerCase()&&book.author.trim().toLocaleLowerCase()===other.author.trim().toLocaleLowerCase();
-const importBook=(book:PublicBook):Book=>({...newBook(book.title,book.author),coverUrl:book.coverUrl,color:book.color, ...(book.catalogId?{catalogId:book.catalogId}:{}), ...(book.editionId?{editionId:book.editionId}:{}), ...(book.pages!==undefined?{pages:book.pages}:{}), ...(book.format?{format:book.format}:{}), ...(book.dimensions?{dimensions:{...book.dimensions}}:{}), ...(book.spineUrl?{spineUrl:book.spineUrl}:{})});
+const importBook=(book:PublicBook):Book=>({...newBook(book.title,book.author),coverUrl:book.coverUrl,color:book.color, ...(book.catalogId?{catalogId:book.catalogId}:{}), ...(book.editionId?{editionId:book.editionId}:{}), ...(book.pages!==undefined?{pages:book.pages}:{}), ...(book.format?{format:book.format}:{}), ...(book.dimensions?{dimensions:{...book.dimensions}}:{}), ...(book.spineUrl?{spineUrl:book.spineUrl}:{}),...(book.spineAssetId?{spineAssetId:book.spineAssetId,spineMode:'custom' as const}:{}),...(book.coverAssetId?{coverAssetId:book.coverAssetId}:{})});
 
 function PublicCover({book,detail=false}:{book:PublicBook;detail?:boolean}) {
   const [failed,setFailed]=useState(false);
@@ -44,16 +46,16 @@ async function updateLibrary(change:(state:AppState)=>{state:AppState;message:st
   throw new Error('Your library changed in another tab. Please try again.');
 }
 
-export default function PublicShelf({id}:{id:string}) {
+export default function PublicShelf({id,accountId=null}:{id:string;accountId?:string|null}) {
   const [publication,setPublication]=useState<Publication|null>(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
   const [selected,setSelected]=useState<PublicBook|null>(null);
+  const [selectedAsset,setSelectedAsset]=useState<string|null>(null);
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState(false);
   const [needsSignIn,setNeedsSignIn]=useState(false);
   const [copiedShelf,setCopiedShelf]=useState(false);
-  const dialog=useRef<HTMLDialogElement>(null);
   const signInUrl=signInPath('/s/'+id);
   function openBook(book:PublicBook|null) {setNotice('');setNeedsSignIn(false);setSelected(book);}
 
@@ -67,10 +69,6 @@ export default function PublicShelf({id}:{id:string}) {
     }).catch(reason=>{if(!controller.signal.aborted)setError(reason instanceof Error?reason.message:'This shelf could not be loaded.');}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return()=>controller.abort();
   },[id]);
-  useEffect(()=>{
-    if(selected&&!dialog.current?.open)dialog.current?.showModal();
-    if(!selected&&dialog.current?.open)dialog.current?.close();
-  },[selected]);
 
   async function saveBook(book:PublicBook) {
     setBusy(true);setNotice('');setNeedsSignIn(false);
@@ -98,8 +96,9 @@ export default function PublicShelf({id}:{id:string}) {
           ...publication.shelf,id:uid('sh_'),title:publication.shelf.title.slice(0,130)+' — my version',publicId:undefined,updatedAt:new Date().toISOString(),
           items:copyShelfItems(publication.shelf.items.flatMap<ShelfItem>(item=>{
             if(item.kind==='book')return bookIds.has(item.bookId!)?[{...item,bookId:bookIds.get(item.bookId!),pinned:false}]:[];
-            // Personal uploaded artwork stays with its owner. Built-in objects are reusable.
-            if(item.decor==='image')return [];
+            // Deliberately contributed catalogue images are reusable; an
+            // unrelated reader's personal upload never becomes a shared asset.
+            if(item.decor==='image')return item.sharedAssetId?[{...item,assetId:undefined,pinned:false}]:[];
             return [{...item,assetId:undefined,imageUrl:undefined,pinned:false}];
           }),()=>uid('it_')),
         };
@@ -125,12 +124,12 @@ export default function PublicShelf({id}:{id:string}) {
           {publication.shelf.description?<p className={styles.description}>{publication.shelf.description}</p>:null}
           <div className={styles.meta}><span>{publication.bookCount} {publication.bookCount===1?'BOOK':'BOOKS'}</span><span aria-hidden="true">/</span><span>A LITTLE WORLD, SHARED</span></div>
         </section>
-        <section className={styles.display} aria-label="Shared bookshelf"><ShelfCanvas shelf={publication.shelf} books={publication.books} onBookOpen={bookId=>openBook(publication.books.find(book=>book.id===bookId)||null)}/></section>
+        <section className={styles.display} aria-label="Shared bookshelf"><ShelfCanvas shelf={publication.shelf} books={publication.books} onBookOpen={bookId=>openBook(publication.books.find(book=>book.id===bookId)||null)} onDecorOpen={item=>{if(item.sharedAssetId)setSelectedAsset(item.sharedAssetId);}}/></section>
         <div className={styles.belowShelf}><p>Every shelf tells a story. Pick a book to begin.</p><BrandMark/></div>
         <section className={styles.copySection}>
           <div><h2>A little inspiration for your own shelf.</h2><p>Keep the books and arrangement. Bring your own personality.</p></div>
           {copiedShelf?<a href="/" className={styles.primary}>Open my shelves <span aria-hidden="true">↗</span></a>:<button type="button" className={styles.primary} disabled={busy} onClick={copyShelf}>{busy?'Saving…':'Make a shelf like this'}<span aria-hidden="true">↗</span></button>}
-          <small>Copies the books, shelf style, and built-in decorations. Personal artwork stays with its owner.</small>
+          <small>Copies the books, shelf style, and reusable catalogue decorations with their credits. Personal decorations stay with their owner.</small>
         </section>
         {(notice||needsSignIn)?<section className={styles.feedback} aria-live="polite">
           {notice?<p role="status">{notice}</p>:null}
@@ -143,18 +142,17 @@ export default function PublicShelf({id}:{id:string}) {
       </>:null}
     </main>
     <footer className={styles.footer}><a href="/" className={styles.footerLogo}><BrandWordmark/></a><p>Your books. Your little corner of the internet.</p><span>MADE FOR KEEPING</span></footer>
-    <dialog ref={dialog} className={styles.dialog} onCancel={()=>setSelected(null)} onClick={event=>{if(event.target===event.currentTarget)setSelected(null);}} aria-labelledby="public-book-title">
-      {selected?<div className={styles.dialogBody}>
-        <button type="button" autoFocus className={styles.close} aria-label="Close book details" onClick={()=>setSelected(null)}>×</button>
+    {selected?<Modal title="Found on a shelf." onClose={()=>setSelected(null)}><div className={styles.dialogBody}>
         <span className={styles.eyebrow}>FOUND ON A SHELF</span>
         <PublicCover key={selected.id} book={selected} detail/>
         <h2 id="public-book-title">{selected.title}</h2><p className={styles.author}>{selected.author}</p>
+        {(selected.spineAssetId||selected.coverAssetId)?<div className="button-row">{selected.spineAssetId?<button type="button" className="text-button" onClick={()=>setSelectedAsset(selected.spineAssetId!)}>Spine artwork &amp; credit</button>:null}{selected.coverAssetId?<button type="button" className="text-button" onClick={()=>setSelectedAsset(selected.coverAssetId!)}>Cover artwork &amp; credit</button>:null}</div>:null}
         <p className={styles.detailNote}>Save this title to your library, then find a place for it on your own shelf.</p>
         <a className={styles.primary} href={normalizeCatalogId(selected.catalogId)?'/books/'+selected.catalogId:'/books?q='+encodeURIComponent(selected.title+' '+selected.author)}>Book page & editions <span aria-hidden="true">↗</span></a>
         <button type="button" className={styles.primary} onClick={()=>saveBook(selected)} disabled={busy}>{busy?'Saving…':'+ Add to my library'}</button>
         {notice?<p className={styles.dialogNotice} role="status">{notice}</p>:null}
         {needsSignIn?<div className={styles.dialogNotice}><p>Sign in to save this book.</p><a href={signInUrl}>Sign in to cybershelf ↗</a></div>:null}
-      </div>:null}
-    </dialog>
+      </div></Modal>:null}
+    {selectedAsset?<CommunityAssetDetails assetId={selectedAsset} accountId={accountId} onClose={()=>setSelectedAsset(null)}/>:null}
   </div>;
 }

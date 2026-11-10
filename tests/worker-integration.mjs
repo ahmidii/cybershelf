@@ -14,6 +14,7 @@ import { runAssetTransferIntegration } from '../lib/server/asset-transfers.integ
 import { runAccountDeletionIntegration } from '../lib/server/account-deletion.integration.mjs';
 import { runModerationIntegration } from '../lib/server/moderation.integration.mjs';
 import { runOriginalBackupIntegration } from '../lib/server/original-backups.integration.mjs';
+import { runSharedAssetsIntegration, sharedAssetCatalogFixture } from '../lib/server/shared-assets.integration.mjs';
 
 // Reuse Wrangler's pinned Miniflare without adding a second runtime version.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -146,6 +147,8 @@ try {
     name: 'cybershelf-account-email-integration',
     bindings: { ...baseOptions.bindings, RESEND_API_KEY: 're_local_test_key_never_sent', AUTH_EMAIL_FROM: 'cybershelf <accounts@cybershelf.test>' },
     outboundService: async request => {
+      const catalogue = sharedAssetCatalogFixture(request.url);
+      if (catalogue) return new WorkerResponse(JSON.stringify(catalogue), { headers: { 'Content-Type': 'application/json' } });
       if (request.url !== 'https://api.resend.com/emails') return new WorkerResponse('External network access is disabled in this test.', { status: 502 });
       assert.equal(request.method, 'POST');
       assert.equal(request.headers.get('Authorization'), 'Bearer re_local_test_key_never_sent');
@@ -177,6 +180,7 @@ try {
   const mailBucket = await mailFixture.getR2Bucket('BUCKET');
   await runAssetTransferIntegration({ base, fetch: mailFetch, database: mailDatabase, bucket: mailBucket, report: message => console.log('✓ ' + message) });
   await runModerationIntegration({ base, fetch: mailFetch, database: mailDatabase, report: message => console.log('✓ ' + message) });
+  await runSharedAssetsIntegration({ base, fetch: mailFetch, database: mailDatabase, bucket: mailBucket, report: message => console.log('✓ ' + message) });
   await runAccountDeletionIntegration({ base, fetch: mailFetch, database: mailDatabase, bucket: mailBucket, authBindings: baseOptions.bindings, report: message => console.log('✓ ' + message) });
   }
 

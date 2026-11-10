@@ -1,0 +1,774 @@
+{
+  "preparedOn": "2026-11-10",
+  "renderer": "Blender 4.3.2 / Cycles CPU / 64 samples",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "modifications": "Orthographic transparent rendering; cropped alpha edges; WebP encoding and thumbnails. Original model geometry and textures retained.",
+  "packs": {
+    "furniture-kit": {
+      "title": "Kenney Furniture Kit 2.0",
+      "creator": "Kenney",
+      "sourceUrl": "https://kenney.nl/assets/furniture-kit",
+      "modelDir": "Models/GLTF format",
+      "extension": ".glb",
+      "licensePath": "License.txt",
+      "archiveSha256": "e67652d0932cee41683f74711c03d3e192a2af9979ef8e6b237711f5482d46b0"
+    },
+    "toy-car-kit": {
+      "title": "Kenney Toy Car Kit",
+      "creator": "Kenney",
+      "sourceUrl": "https://kenney.nl/assets/toy-car-kit",
+      "modelDir": "Models/GLB format",
+      "extension": ".glb",
+      "licensePath": "License.txt",
+      "archiveSha256": "26c11bbb77102b8dd00cdaf7b2c7ab692416d750dd064de886d809acec346782"
+    },
+    "holiday-kit": {
+      "title": "Kenney Holiday Kit",
+      "creator": "Kenney",
+      "sourceUrl": "https://kenney.nl/assets/holiday-kit",
+      "modelDir": "Models/GLB format",
+      "extension": ".glb",
+      "licensePath": "License.txt",
+      "archiveSha256": "fde4d514d7297388d98058e8933ff614e071886f7ce57f9aea4b00d7698dd769"
+    },
+    "food-kit": {
+      "title": "Kenney Food Kit",
+      "creator": "Kenney",
+      "sourceUrl": "https://kenney.nl/assets/food-kit",
+      "modelDir": "Models/GLB format",
+      "extension": ".glb",
+      "licensePath": "License.txt",
+      "archiveSha256": "cdad90853682499b94c9fda2f87678b24bfd8f3264e0ed323f6b6a27fd7c6f6f"
+    },
+    "kaykit-furniture": {
+      "title": "KayKit Furniture Bits 1.0 Free",
+      "creator": "Kay Lousberg",
+      "sourceUrl": "https://kaylousberg.itch.io/furniture-bits",
+      "modelDir": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf",
+      "extension": ".gltf",
+      "licensePath": "KayKit_Furniture_Bits_1.0_FREE/License.txt",
+      "archiveSha256": "e6d75f34c5545486b5a8f45f86209dbd49092f3e77ae23011bdb87edab89e7e4"
+    },
+    "cube-pets": {
+      "title": "Kenney Cube Pets",
+      "creator": "Kenney",
+      "sourceUrl": "https://kenney.nl/assets/cube-pets",
+      "modelDir": "Models/GLB format",
+      "extension": ".glb",
+      "licensePath": "License.txt",
+      "archiveSha256": "b3bdc99a2ec92c687b875718c5d01e9231d2711ed0e2845f295b474bb42a1283"
+    },
+    "space-kit": {
+      "title": "Kenney Space Kit",
+      "creator": "Kenney",
+      "sourceUrl": "https://kenney.nl/assets/space-kit",
+      "modelDir": "Models/GLTF format",
+      "extension": ".glb",
+      "licensePath": "License.txt",
+      "archiveSha256": "d5d7cdf2635ed5a43a9187deaf409b6f47484e402321128341d3c3698e9ef4d9"
+    }
+  },
+  "assets": [
+    {
+      "id": "dc_furniture_kit_plantsmall1",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/plantSmall1.glb",
+      "modelSha256": "2b9c022feb47be857b2c4fdc29f36522766ba9b70c578c31d7c05d71b4377d15",
+      "renderSha256": "ec121381a833fb360695575ee72df33effd4dd224fb1b09892ce8ea9fbde3311"
+    },
+    {
+      "id": "dc_furniture_kit_plantsmall2",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/plantSmall2.glb",
+      "modelSha256": "d7c8ff42c66dd4f9238a73570549813d1ca6c5f6f661d7af9cb764c4fce314b9",
+      "renderSha256": "5a0f8c715637896a00a21feef3854acd5238b3ee603b878f5463db2d6aec9846"
+    },
+    {
+      "id": "dc_furniture_kit_plantsmall3",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/plantSmall3.glb",
+      "modelSha256": "1aa38b1b22bd19fa4f9f3abd8c4cbf50da2d6fa721cf1f9aa4d80bb89b1bef94",
+      "renderSha256": "96c290f3a761a89a8ce59fb84a1bb24b9ff1958596dfa1fc8090f54a8f398ef5"
+    },
+    {
+      "id": "dc_furniture_kit_pottedplant",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/pottedPlant.glb",
+      "modelSha256": "5b760eda2766f75fda36b2c5df652a1662f82981ef64cd8fa7fe7bcd386b3a15",
+      "renderSha256": "92c23e0c7128b85f195d24c7aad625012da75f4c3283a01676a0da9f17bdde41"
+    },
+    {
+      "id": "dc_furniture_kit_bear",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/bear.glb",
+      "modelSha256": "fd87c08f81dcd652b1f7f61afae9d1f040fa1322ac4ddda6f543ed423b954aed",
+      "renderSha256": "445c95110178efe28ac36aa81be08078d9ad14a853ac1c7c5867afce160b1186"
+    },
+    {
+      "id": "dc_furniture_kit_radio",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/radio.glb",
+      "modelSha256": "1ba93d6ba6f049750853b4652b92f286f2898e527695a0705b75cc7615897fed",
+      "renderSha256": "f249fb3b655e49d3dc8867b4835be0eb3c13bbe0b5e31b6c51b8e56ed72c0440"
+    },
+    {
+      "id": "dc_furniture_kit_speakersmall",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/speakerSmall.glb",
+      "modelSha256": "34db09984703282822f3f57fc9a31bfdfa6a8f6bf8251893d0c907e7ee6601b2",
+      "renderSha256": "ac25f95d5e07e36a3f3c4f29975c59a59a2cd2a3840622e6200bf8a4a5bf78d8"
+    },
+    {
+      "id": "dc_furniture_kit_lamproundtable",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/lampRoundTable.glb",
+      "modelSha256": "75bb644caaa3da003b4fcad7a931722dd61cd2858aab70cf660021d5061fa1b2",
+      "renderSha256": "6addae6da040d29aeea6dcb38d3edef45bfb69a04f46b5cf83a501d3e30d0723"
+    },
+    {
+      "id": "dc_furniture_kit_lampsquaretable",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/lampSquareTable.glb",
+      "modelSha256": "70ec9211af336b1ef3b4da32590b8737b4facf219348c22e6533a1e898cdb13d",
+      "renderSha256": "0cf16e04435d3d1357fab0e904c226144bcd34466acfd4cabd369e7adea04619"
+    },
+    {
+      "id": "dc_furniture_kit_books",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/books.glb",
+      "modelSha256": "b8dc56e5d29f6fc1f4727fccb1b9642627fee9942c48060a00034e98df02701c",
+      "renderSha256": "ee8da9a315bac58174138797c0bcf3a4a950ef7a63175d61ebbc94ffe5cc56f8"
+    },
+    {
+      "id": "dc_furniture_kit_pillow",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/pillow.glb",
+      "modelSha256": "6fae7c190d0b676ef3efd35e5178cef21dffb5c80e1257d8b537ad424da0e5f6",
+      "renderSha256": "6971208db9efe0176a95a4e4ed2759bfcb6fc87ab23b07ae314570b0fc0e53d8"
+    },
+    {
+      "id": "dc_furniture_kit_pillowblue",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/pillowBlue.glb",
+      "modelSha256": "8326e018c09cb00c19c2c9b745f521cd7eba1169b755322b04f88440dbfef319",
+      "renderSha256": "f17b9619c332fd3e20edbdfb842600e43b9fbbf37ac2b616217cf6cf075d3f70"
+    },
+    {
+      "id": "dc_furniture_kit_toaster",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/toaster.glb",
+      "modelSha256": "38c1fb7b122be9997758c8ee855d87f28014cf282f24d66d39f4e8d8b236d2af",
+      "renderSha256": "364949aeb3751266d0e00e05a9614c6f287cb2d11f8af15a4ff57ab5bb7aa81c"
+    },
+    {
+      "id": "dc_furniture_kit_laptop",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/laptop.glb",
+      "modelSha256": "5fa8a1f4a71ab8d82ef64da77a6973ffd350c6d4557516069a4ffd4bb8d808af",
+      "renderSha256": "4c2fb1dd6396577edc47c5f100c87d6dc1ce22ad24a12ba853e24ab3dc8e48dc"
+    },
+    {
+      "id": "dc_furniture_kit_televisionvintage",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/televisionVintage.glb",
+      "modelSha256": "eb144cc8fb1e7f761e3665226e4266c8868679421d21d6548f24d2abad7c67cf",
+      "renderSha256": "535e4c9c7b10b019d040d1e7c0b3808bf4f139314e2af461d4b63396a9f0c0c8"
+    },
+    {
+      "id": "dc_furniture_kit_kitchencoffeemachine",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/kitchenCoffeeMachine.glb",
+      "modelSha256": "063f582c6fa0f00a9f24e3393dac2295491c4becdaf5513c893ab1a2826b6ec3",
+      "renderSha256": "61c2c5f87224388531f4d31db12d6c55707a8bd586221cf8c695cd2009feaca1"
+    },
+    {
+      "id": "dc_furniture_kit_computerscreen",
+      "pack": "furniture-kit",
+      "modelPath": "Models/GLTF format/computerScreen.glb",
+      "modelSha256": "5942cbad29a2d2b956619569926e81d50a4174403d592fece6556e57632dc643",
+      "renderSha256": "6714b22d314def37e003cb8d4f5e8e3c87741fe8b824f66db48973bfa4cba13b"
+    },
+    {
+      "id": "dc_kaykit_furniture_cactus_small_a",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/cactus_small_A.gltf",
+      "modelSha256": "4e2d93fb22b7f6097f3726b1fc513647873428224c01b17abdbe79c01c1e959b",
+      "renderSha256": "3d9210b5210253dc785240ff627fa868cc7809e739715570717200e7cd6e541b"
+    },
+    {
+      "id": "dc_kaykit_furniture_cactus_small_b",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/cactus_small_B.gltf",
+      "modelSha256": "f3f9555486151b309d682a94dc120d893167bd8f506f61c20264a23c8b54d38d",
+      "renderSha256": "386688097f78fa06fdce82a772467e73565f513eee568e95a6742d2be567f19a"
+    },
+    {
+      "id": "dc_kaykit_furniture_cactus_medium_a",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/cactus_medium_A.gltf",
+      "modelSha256": "902c48a87bf8e48a2d72055485eaaeae3aefd91224e5af914aeb42fca99759a8",
+      "renderSha256": "baf72c016780da301f8080f713d159367a278705bbadf472ee0ffec11c16ace6"
+    },
+    {
+      "id": "dc_kaykit_furniture_cactus_medium_b",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/cactus_medium_B.gltf",
+      "modelSha256": "849e6bf20405548890ebff081970f92a39af6e749a3fbb0ecc8f0363748c5e3b",
+      "renderSha256": "79af5d0e1572f2f76935210ae3c3c96a8a052de981d6098fcbb41a0939a3b3b0"
+    },
+    {
+      "id": "dc_kaykit_furniture_pictureframe_standing_a",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/pictureframe_standing_A.gltf",
+      "modelSha256": "214ae94eacc35984cfec9185ef05e6c930bea45c974b3cec013e991b841fae1b",
+      "renderSha256": "cb186f292c31fb21f38dbf6d1c17374955094ac7c8cda61937493f982622730c"
+    },
+    {
+      "id": "dc_kaykit_furniture_pictureframe_standing_b",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/pictureframe_standing_B.gltf",
+      "modelSha256": "93933e6d9b96b8f3718e2dc7be1723e8bf8604f35dd035796a88618f2a33dddc",
+      "renderSha256": "4af1d7710f45771959425df8b53c8afbac913c2f16c4d5bb291847b875d233ac"
+    },
+    {
+      "id": "dc_kaykit_furniture_pictureframe_small_a",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/pictureframe_small_A.gltf",
+      "modelSha256": "4482cf85a994f9ba3ef45fe490858e5633ef0f09767f79a8511b826024e1de85",
+      "renderSha256": "0b431a5f042dc600e8c4df62804e32180b6a1d8f04ad1a868089c3b07c095079"
+    },
+    {
+      "id": "dc_kaykit_furniture_pictureframe_small_b",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/pictureframe_small_B.gltf",
+      "modelSha256": "b65a9e655be3dbdfa02c0363bf5652461b480f53a584a3749d19e26120435bfa",
+      "renderSha256": "48d78a1e166bcac24678b707ebe70f5a8884e35b461b064b5aab2e7669422bf5"
+    },
+    {
+      "id": "dc_kaykit_furniture_pictureframe_small_c",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/pictureframe_small_C.gltf",
+      "modelSha256": "ca88e60a46bfa85e6b22bd318b2d2aac33a247ab0d480ae995fa13157f4d2731",
+      "renderSha256": "4db9cce6db0eac39f0fe13f981aa2a7c2f52ab489d5b9bd26409883931ff2a7e"
+    },
+    {
+      "id": "dc_kaykit_furniture_lamp_table",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/lamp_table.gltf",
+      "modelSha256": "7cc2e9f24145551bfc919247e74a414bbd40bc2fde1fb9a1ac33e16cb9d0497b",
+      "renderSha256": "36027d170f80b43a87b1594ffffdcc7ac0d8920e06326d75d01e2fd19fdc1968"
+    },
+    {
+      "id": "dc_kaykit_furniture_pillow_a",
+      "pack": "kaykit-furniture",
+      "modelPath": "KayKit_Furniture_Bits_1.0_FREE/Assets/gltf/pillow_A.gltf",
+      "modelSha256": "c24247361c709675257b516dfab950708adf8c086710e8a1fc85e572ea5ebb61",
+      "renderSha256": "beeb09c80c8922d55d418644aab5160127a842e1868622c2c0f4e2e8b638ab10"
+    },
+    {
+      "id": "dc_toy_car_kit_vehicle_racer",
+      "pack": "toy-car-kit",
+      "modelPath": "Models/GLB format/vehicle-racer.glb",
+      "modelSha256": "2cdf369f231bf3e38bdf3a376144971f1b4d1a1e558000047ac927c5ac81a42c",
+      "renderSha256": "4b7e864a7130408cbd4536ef6b68b7ce4295de71755e3f1b8482162127c1f6a6"
+    },
+    {
+      "id": "dc_toy_car_kit_vehicle_racer_low",
+      "pack": "toy-car-kit",
+      "modelPath": "Models/GLB format/vehicle-racer-low.glb",
+      "modelSha256": "d585746ad006094cf745630b2866af65c6c244589dab346179fd41007f9fac6e",
+      "renderSha256": "0cd0708066e5125976bccdf1734400af1750fda06afcdf477cd61f503eaeec84"
+    },
+    {
+      "id": "dc_toy_car_kit_vehicle_vintage_racer",
+      "pack": "toy-car-kit",
+      "modelPath": "Models/GLB format/vehicle-vintage-racer.glb",
+      "modelSha256": "8528456ca062685ddabb713509eb60b82146e26343b283344c26811dd5d8faf8",
+      "renderSha256": "e7799ebb10fa6a9be97d59c5a70530aae81650add21312b46c9a01b6d2fb5fb2"
+    },
+    {
+      "id": "dc_toy_car_kit_vehicle_speedster",
+      "pack": "toy-car-kit",
+      "modelPath": "Models/GLB format/vehicle-speedster.glb",
+      "modelSha256": "64e7e343e5039105949a827234de550630d75183cf5836d76b113ab65e355175",
+      "renderSha256": "de1189218d4a01c9d2befabf45077fd3a8410a343176ee2525945c898d1e204d"
+    },
+    {
+      "id": "dc_toy_car_kit_vehicle_suv",
+      "pack": "toy-car-kit",
+      "modelPath": "Models/GLB format/vehicle-suv.glb",
+      "modelSha256": "31abd2c49ec052f193c6afacf801a0c997b79afc07cde1d1edea13dc33e1d501",
+      "renderSha256": "f7ab1849fedf99e3151705d3cc8b0d47bd6835879d12264756fe535b68d46a6e"
+    },
+    {
+      "id": "dc_toy_car_kit_vehicle_monster_truck",
+      "pack": "toy-car-kit",
+      "modelPath": "Models/GLB format/vehicle-monster-truck.glb",
+      "modelSha256": "5cab772a63005db81504a3403b54c5de73f23bfb731c93405811d73025d6db3e",
+      "renderSha256": "e4f52ad7e6f67a041e220fc5177553aad1d35af09674429070173f14cdc10f6f"
+    },
+    {
+      "id": "dc_toy_car_kit_vehicle_truck",
+      "pack": "toy-car-kit",
+      "modelPath": "Models/GLB format/vehicle-truck.glb",
+      "modelSha256": "7de382da801189fcbf8672ae18ac97af6aa3e248234d9e50cd7debe16475e69b",
+      "renderSha256": "573fe93fe0a6901cd66e57249cf1412f83bbea6fdb12eb9b54760ee6c8847765"
+    },
+    {
+      "id": "dc_toy_car_kit_vehicle_drag_racer",
+      "pack": "toy-car-kit",
+      "modelPath": "Models/GLB format/vehicle-drag-racer.glb",
+      "modelSha256": "e55cec7720744af6bdee05f0716c032dabede9d173a3629fd8af7ec58447ce1d",
+      "renderSha256": "2c4159d635e39c1a5172cecc15dfc6387fc36c2fe1e535f4775099f7f4e710b2"
+    },
+    {
+      "id": "dc_holiday_kit_lantern",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/lantern.glb",
+      "modelSha256": "42c4851862b3ea223c49e387c10353b4ee3cfb95dc178020bcabd123d0abeb85",
+      "renderSha256": "d681d0fa976485f14283820b8988bb68a52985bdab96f10221f0eaeb3ca03c88"
+    },
+    {
+      "id": "dc_holiday_kit_reindeer",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/reindeer.glb",
+      "modelSha256": "b13c2155cb93f1dfcc0f818b4321501374611e1b3260ed4f395e2aec617815be",
+      "renderSha256": "fa4c0f11917b64099ae67cc60da1c035fdbecc97fccc1f1a70c4e18cef8540a1"
+    },
+    {
+      "id": "dc_holiday_kit_nutcracker",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/nutcracker.glb",
+      "modelSha256": "a69d1e71903ef07d70d9b44ef7a17d855af784a9125069890a157e8abbd0a1e5",
+      "renderSha256": "953df2da81402fb0f55ade56a5bc138f5ee347990d8588b057707251b6404d92"
+    },
+    {
+      "id": "dc_holiday_kit_snowman_hat",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/snowman-hat.glb",
+      "modelSha256": "3734abb86420eda3278012beccc7344afc39161415c10422a20a6ae5fa4e338f",
+      "renderSha256": "321624039abafde9c28f3e8d9fe4d895746995f3dedd077fef38e557d8494c49"
+    },
+    {
+      "id": "dc_holiday_kit_snowman",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/snowman.glb",
+      "modelSha256": "9124463abc03ec477f35b478692ba06cf15c17420a86321a6e4deb72deac4ef4",
+      "renderSha256": "fd85fb1a514666fd896d043c40ae722283daf46d8ae9a59c7e3661383651c340"
+    },
+    {
+      "id": "dc_holiday_kit_gingerbread_man",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/gingerbread-man.glb",
+      "modelSha256": "cea459983f5c02a70c2ad95e445b4b289ee100503637e8e57f943bab277a8fdd",
+      "renderSha256": "d67a85fd50edee596b27bccd9204578f5823fd1c8df4d7ac6a6af63803ca5434"
+    },
+    {
+      "id": "dc_holiday_kit_gingerbread_woman",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/gingerbread-woman.glb",
+      "modelSha256": "2dcdfcbf91cbab6138fcad98aeb9a7fb3e2d78d07ec2c0c2b16526db1ede1382",
+      "renderSha256": "691f09448dd8bf38c9a92f1baeac6ae591cf0a0162fb9317f7fca0cf31fe1b97"
+    },
+    {
+      "id": "dc_holiday_kit_present_a_cube",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/present-a-cube.glb",
+      "modelSha256": "6b41be140855d42aeda4bde41fa4eaaea19fb1f2d36289cd10fcd742f2003423",
+      "renderSha256": "331adc129aee0ca522e8e2281aa5a5702a5f05648d2c6d507938fa2a3b6d3232"
+    },
+    {
+      "id": "dc_holiday_kit_present_b_round",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/present-b-round.glb",
+      "modelSha256": "a0716bb7f709ae418659851afc8f3ff64df5f33171bd4e70d0079c5c6fb24e51",
+      "renderSha256": "426c152645631e03cd2a432dc934afcc55b46e3603e8f9cdcb3d524e81a55ddd"
+    },
+    {
+      "id": "dc_holiday_kit_tree_decorated",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/tree-decorated.glb",
+      "modelSha256": "152dc0bac97afaa34fbe1c2178d42e15fb725516b67ab690f4e6a219b761c1af",
+      "renderSha256": "c379cbfa798d99c3c4e9a36782ab971502c6ae70aee890c92fc36ba9e3d086fb"
+    },
+    {
+      "id": "dc_holiday_kit_tree_snow_a",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/tree-snow-a.glb",
+      "modelSha256": "582c4c33e9833372afd0e63f55822006b005b4555dd2ae061fa1cef1813574de",
+      "renderSha256": "2f7e0bf0ef438b8764d2ad1144d9ad3c8d172ee16b39638fb7d4448e62f3a834"
+    },
+    {
+      "id": "dc_holiday_kit_hanukkah_menorah_candles",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/hanukkah-menorah-candles.glb",
+      "modelSha256": "5e497c7aad238ec96fcc6501ca2e9d5bb94d65134e845c4262ac7309b4723587",
+      "renderSha256": "3e4b21584bc76f66014cafdd75a0438682aa18e12531cf601fa7248093473a9b"
+    },
+    {
+      "id": "dc_holiday_kit_hanukkah_dreidel",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/hanukkah-dreidel.glb",
+      "modelSha256": "95f8f70252aa2e3da35586453aa3e422b74c365d6ac643de846ea177d6de6f65",
+      "renderSha256": "a7ecabe0ed037a854b68372fcd6e45f695617417bc75a7c5f16d56f16ce16fb6"
+    },
+    {
+      "id": "dc_holiday_kit_kwanzaa_kinara",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/kwanzaa-kinara.glb",
+      "modelSha256": "0b09d40148a812439be7d0a2abe5698756ba45ae6694729e3af58150790140f2",
+      "renderSha256": "5ff3b97a6410b1563e55bb706da662d0febd8d689a4721e272de17f11fabb7a9"
+    },
+    {
+      "id": "dc_holiday_kit_train_locomotive",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/train-locomotive.glb",
+      "modelSha256": "9d3457ce856a07f9793194d00042260fb215f9352889131aa9687fa1905e45c9",
+      "renderSha256": "92eb381af9fcd2d9fcc363d6f8aed33fd4c63863c2cfce9bc3ae62b60a6aa356"
+    },
+    {
+      "id": "dc_holiday_kit_train_wagon",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/train-wagon.glb",
+      "modelSha256": "585988fc3c6624b58cf01969cd3626234a521f416e4e7910a8409954175b8db1",
+      "renderSha256": "1c71e34ecb76f73b0fdbc8ffdc2fb70db1d4440b946e84f57de4b4625dc5feb6"
+    },
+    {
+      "id": "dc_holiday_kit_sled",
+      "pack": "holiday-kit",
+      "modelPath": "Models/GLB format/sled.glb",
+      "modelSha256": "4e33b581b495375c289b36fe60e4d53a3f8e2e7bd957a1b05185f17f101930d4",
+      "renderSha256": "3183609b591e59c304eb82c67391cc86af73898e4e1cffda93b1c0a2c6b99136"
+    },
+    {
+      "id": "dc_food_kit_mug",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/mug.glb",
+      "modelSha256": "5215ef74dbbc3a1c0ecf8d0937adde745bbcbd65d8facd228d9f3371991da435",
+      "renderSha256": "366e5b5b95a3fb0b04605882b13e4a2d438c2d17a199f1f689a7f2873eedfcbf"
+    },
+    {
+      "id": "dc_food_kit_cup_tea",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/cup-tea.glb",
+      "modelSha256": "c2d60aeca48197b75ddb9f1ba145bd5e9c9e66e720b8ab67947f0b2a49ee1edd",
+      "renderSha256": "943e16ed68be72ddea625ec31c38c2736c55c941331e70cfd8b44035e1d61790"
+    },
+    {
+      "id": "dc_food_kit_cup_coffee",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/cup-coffee.glb",
+      "modelSha256": "d74652ad1821bc5dedf1b2e1deb4e0ca0c498aa73880e7df5b91e5e729af6f81",
+      "renderSha256": "02cb42f1995e8109c36628be6875cf887ff196f87e41219f3e430e079c964b8e"
+    },
+    {
+      "id": "dc_food_kit_frappe",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/frappe.glb",
+      "modelSha256": "4e5aafa4bff86fff9e4b5e5ef747cc93edfaa7d50c02f33e3b45480e68017d1b",
+      "renderSha256": "9bd46b272dbeb27c3e3b7f9bec10a321b6dc5a77a032469a96555e8609db10d8"
+    },
+    {
+      "id": "dc_food_kit_cupcake",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/cupcake.glb",
+      "modelSha256": "84b2681793445607b846023f0314abe74f70a65ee51c999df4322348934fb2ce",
+      "renderSha256": "884ec4c7d6bd871fdad21ef7d34794111e82ac4df1798c0b15bf3ac9319d737b"
+    },
+    {
+      "id": "dc_food_kit_donut_sprinkles",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/donut-sprinkles.glb",
+      "modelSha256": "f45946b7e81221e9d45fdfab45ee89eeb095ff0d7fb6a3ad9988919cf587d3b7",
+      "renderSha256": "cdc6f0fa59d713163d3e348964a7c21bbc5962639c56b0d4d8ff1171160af72c"
+    },
+    {
+      "id": "dc_food_kit_croissant",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/croissant.glb",
+      "modelSha256": "f2f8ee64d7850b262a6af2492cd042fa8eb6506cde49d439360ad1a3df48fe9e",
+      "renderSha256": "e712460b87a8be6379605f22ae1940007c908d79c50f24f27d43def15082f467"
+    },
+    {
+      "id": "dc_food_kit_cake_birthday",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/cake-birthday.glb",
+      "modelSha256": "3102379c244fa77cdd4818c316037f576f3fb172d28f161ae9e8deead55dac69",
+      "renderSha256": "9e43a863de8a36e69ada6b86d2e8f46ca073925a6fb1ab8ac1289d05589f441a"
+    },
+    {
+      "id": "dc_food_kit_ice_cream",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/ice-cream.glb",
+      "modelSha256": "6258b20c40102ec4e86679e39a0618e1a025f302bf7bc8fdc618ebdd520cf83e",
+      "renderSha256": "aa849da6a3cc1c5e90961694f74c246923fb92722368caf103287dbfc3677847"
+    },
+    {
+      "id": "dc_food_kit_rice_ball",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/rice-ball.glb",
+      "modelSha256": "1c68253d36c0705da38a63226521be1f949bd9ce4b7ff8f8529878cd0aae6e08",
+      "renderSha256": "a4e923350c6ecfb6ff53ba67d4ba93f0a13d0acd32dd747aedb1da1f07622777"
+    },
+    {
+      "id": "dc_food_kit_maki_salmon",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/maki-salmon.glb",
+      "modelSha256": "aaf9e30eada4b6daa483c29ed6db0060b9e05c891a63d8a62671b66bb16535a5",
+      "renderSha256": "983bc3a078ce370cd76559ea360f5951ee9224af9a413c6e419f08a80f7e3977"
+    },
+    {
+      "id": "dc_food_kit_sushi_egg",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/sushi-egg.glb",
+      "modelSha256": "aa0a51a5e5b826e6712f256eabaf391f6c4f59db7c321567373be0fc3cc6a478",
+      "renderSha256": "44b7095051288a802f053eb3c594a8745ba8d34363ab67543eb5b387dc6e2cbb"
+    },
+    {
+      "id": "dc_food_kit_pumpkin",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/pumpkin.glb",
+      "modelSha256": "57f1667bfd266afd5eb650e81a7d207078f5d76cbd1a17351bf7503794f69592",
+      "renderSha256": "195319b72c8c42b1042f61da11444d9d86c8286ba5c9b6ac5e0bc56387c16be5"
+    },
+    {
+      "id": "dc_food_kit_mushroom",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/mushroom.glb",
+      "modelSha256": "9ba28f47de26738f31083e590180aba99568f4399de0ec271924f0b278bac997",
+      "renderSha256": "105f3eed47944a9e28f80b134fc6a6b2c50ca9a943a28ca85fe76b675721e02a"
+    },
+    {
+      "id": "dc_food_kit_apple",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/apple.glb",
+      "modelSha256": "2a80ab65d5bc2cb4f2bca1e8176cbb591849a288596d4b2e76e411338761a526",
+      "renderSha256": "67bd2c7ce9e7b09b1e32696174dc49ebdef6d10540285ad167abd88421d886a6"
+    },
+    {
+      "id": "dc_food_kit_pear",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/pear.glb",
+      "modelSha256": "436e8fdb9dc42100ab0135fc29e68f8609d5b3c5ac7d14062ed9aadfaef4d11f",
+      "renderSha256": "ca5088ad13d89e73f8928586ad175dcbe984418cc69f90efba3d01b97e6a5fd2"
+    },
+    {
+      "id": "dc_food_kit_strawberry",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/strawberry.glb",
+      "modelSha256": "685828642a92681b474c29abbd9cabe98c7bcade62cc50da57ec6658a5b7e8f7",
+      "renderSha256": "3534c606342c5d64b7da5967ab3f8ef49ca3169c5c4d6fc617a9b504cbb26d02"
+    },
+    {
+      "id": "dc_food_kit_pineapple",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/pineapple.glb",
+      "modelSha256": "dfa3b656350273eeddb92fd6a8bf6b90b3bae63b3285880eb66c8835e9c86b91",
+      "renderSha256": "3e3b0455634c19b1dc77197db0b5bf1dc7d8a368bcc5575c8b8efcbd3d9180dc"
+    },
+    {
+      "id": "dc_food_kit_honey",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/honey.glb",
+      "modelSha256": "7a28a642f074e22c0a570789655fda0d7bd33727159ab23831ac7d22bf258a94",
+      "renderSha256": "cfb6c2fc9dc3b2ead5a8c862a16e13e78aab3f8b988780decebf31364e259256"
+    },
+    {
+      "id": "dc_food_kit_cookie_chocolate",
+      "pack": "food-kit",
+      "modelPath": "Models/GLB format/cookie-chocolate.glb",
+      "modelSha256": "bf7894020a6d0d0acd120a69d96a9088b226f5d557b7d7a3441e9fc8169d2fe6",
+      "renderSha256": "4a75f4a3054fa5b1695bb88b4b89742559366a1734591c6d0ec83d23eebc7dfe"
+    },
+    {
+      "id": "dc_space_kit_astronauta",
+      "pack": "space-kit",
+      "modelPath": "Models/GLTF format/astronautA.glb",
+      "modelSha256": "9db62dd9790beadc1b8e45cf9623e99ade21751bb23f16dfe1b8cfb05a54f3b5",
+      "renderSha256": "cf7e173ea0df1fef9e7e3783efe882ad50b91de4a64f70e1365cc50b23aa5d87"
+    },
+    {
+      "id": "dc_space_kit_astronautb",
+      "pack": "space-kit",
+      "modelPath": "Models/GLTF format/astronautB.glb",
+      "modelSha256": "6fa5b3e11cb3d117b28a0794b261ad9107f16ca6ce886b288493e22493d74d2d",
+      "renderSha256": "3872d305da75551c3d6a05ff8eeb9ba3df1b2315e37e43b29e866e6c07c7ea3c"
+    },
+    {
+      "id": "dc_space_kit_alien",
+      "pack": "space-kit",
+      "modelPath": "Models/GLTF format/alien.glb",
+      "modelSha256": "c041e8ed0eff82f0b25b944a8107f1268ddbec9c2c93afedc4ee0e8b047d983d",
+      "renderSha256": "501373b15d550872e3e782f7a7f8555c6a54cf837f79ca272641135d5ef821bf"
+    },
+    {
+      "id": "dc_space_kit_rover",
+      "pack": "space-kit",
+      "modelPath": "Models/GLTF format/rover.glb",
+      "modelSha256": "9784549775017e540ab84e6fc0eb8a1902dbeff9ba4285cecb97c086d2937fa5",
+      "renderSha256": "61eaac78fca2603b53a385c20304f3f565caeb2db650cdddbb949cb7a5cc5b54"
+    },
+    {
+      "id": "dc_space_kit_craft_speedera",
+      "pack": "space-kit",
+      "modelPath": "Models/GLTF format/craft_speederA.glb",
+      "modelSha256": "dc48652fa5c59088a5e3902abce7598199f32e0dcb8c91bac25e17bb8ce15876",
+      "renderSha256": "4af465e6c977b3b7b162bc30183673e855412c95d9947ca9608932166c90b7a2"
+    },
+    {
+      "id": "dc_space_kit_rock_crystals",
+      "pack": "space-kit",
+      "modelPath": "Models/GLTF format/rock_crystals.glb",
+      "modelSha256": "fbe5ce9cf6a036594b0eb4fc475633753bcd05780bf60bd82aa9c63fcbfd4e76",
+      "renderSha256": "3b514d548994b9505b3c475ac99c2ca9a81205e29c8486fa6d98bb2ce723f096"
+    },
+    {
+      "id": "dc_space_kit_meteor_detailed",
+      "pack": "space-kit",
+      "modelPath": "Models/GLTF format/meteor_detailed.glb",
+      "modelSha256": "f30379abd7d772a2fdc52ebb72ad2b5fc94768343cb8f6788614820f632c5e63",
+      "renderSha256": "edce482883e29af7200db45dd974c95ff43c0f93a931473fe7afb76abcde3119"
+    },
+    {
+      "id": "dc_cube_pets_animal_cat",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-cat.glb",
+      "modelSha256": "1e73aaf7d497dd7d2946badf92d189d2333f163e66dced91feb446bc9bdee850",
+      "renderSha256": "d4fd29ad8922612edbf6cbaf25287fc3d16adf3bf1871687c48cfbf147570524"
+    },
+    {
+      "id": "dc_cube_pets_animal_dog",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-dog.glb",
+      "modelSha256": "c127d71ac8794f9710313bbb44800ae33a79f1182cf5c523c4233cc10a93851f",
+      "renderSha256": "3583b0d57ec4cdc28117e0ba1bb2b744d83536ba25be3ed9af055fabbc3f2a05"
+    },
+    {
+      "id": "dc_cube_pets_animal_bunny",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-bunny.glb",
+      "modelSha256": "94b654915d9de70071bcf0bfa13de379a3ba4fdfeb231f0fec49335232cbc821",
+      "renderSha256": "290bc9ee35b2aaa3a453c3bc49964b7f2cd0f6a11996c3a2b1dc4783e653e94e"
+    },
+    {
+      "id": "dc_cube_pets_animal_fox",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-fox.glb",
+      "modelSha256": "ac1ae804da301371509cff84206e3c6b78ff9c7d02411ef0cd004731090d6b82",
+      "renderSha256": "370af763d147b46c7dd59d31de77517122e53b3faddfa9d35bb49ccf3796f7f0"
+    },
+    {
+      "id": "dc_cube_pets_animal_panda",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-panda.glb",
+      "modelSha256": "e001aea4fcd1c2dcb384774019f84183e6d0b638ebd986da65fee32bd93d1359",
+      "renderSha256": "2c5c0548ab8e6a71263ee8995d3cfecc24bf6a44f6a1587ce7108ed7f0ec1c15"
+    },
+    {
+      "id": "dc_cube_pets_animal_penguin",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-penguin.glb",
+      "modelSha256": "ff3d7ccae941ab06773a348b03446f97650043594ab1121a26514c3e2ea6cb29",
+      "renderSha256": "6bde075b375c6c1d2e0bfba86a20d5e602c897fdff315ae2f1a8cf980264d518"
+    },
+    {
+      "id": "dc_cube_pets_animal_koala",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-koala.glb",
+      "modelSha256": "ba13a1975bd746c59e2dce8309736c26597c8a9839602f736e4ec8570ba84fa0",
+      "renderSha256": "ccb626bb4711aac3c9c5642b8a9425d4de4d9b9073816b3a820c1ce96cd52756"
+    },
+    {
+      "id": "dc_cube_pets_animal_polar",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-polar.glb",
+      "modelSha256": "8e94b6a8f44b38198f698f2262c3ed7aed34bd1cb3a016f7613fb5eea0897564",
+      "renderSha256": "fe95467dc323c29186c2582712567fd7cb002f62fb4d0f45fc7b4e761c30166f"
+    },
+    {
+      "id": "dc_cube_pets_animal_lion",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-lion.glb",
+      "modelSha256": "64697c4a76357fe8d9688fe077a5e74e527a6602574fd0941895be84b5883703",
+      "renderSha256": "e0d0cd2a6eb18aa96ee365dbeeed6c152ee9047a7a51bb184d01a42b0028eeed"
+    },
+    {
+      "id": "dc_cube_pets_animal_tiger",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-tiger.glb",
+      "modelSha256": "cc70cdfd27ec6550b7a4524a3cc75fd594f94d384cac2bb68504b60d379f47d4",
+      "renderSha256": "ab267a91321c1f0b2470252885a070e0b89e93c3a81b19a3d379837d8e4dbd26"
+    },
+    {
+      "id": "dc_cube_pets_animal_elephant",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-elephant.glb",
+      "modelSha256": "0831346fb8ddb8e99e42e3f92fb48858551049dc7ea49e641d90fdfc65e057be",
+      "renderSha256": "dc266ca911f14542229a2da3b5186c4e025d61f9cb2c93a94d4acb31a5316a60"
+    },
+    {
+      "id": "dc_cube_pets_animal_giraffe",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-giraffe.glb",
+      "modelSha256": "ab3562e1edb4dc6b14d5c7c9083ba3052a44ca0ccdcac2c15461d84397dc2f31",
+      "renderSha256": "b9117e3ce1fcc00236c7aecd98d20a1fa51e901c4651c922254b9490e94ea793"
+    },
+    {
+      "id": "dc_cube_pets_animal_deer",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-deer.glb",
+      "modelSha256": "b37162d91001eefda02bd111c8e836a0c4d805ab0191887459ded0d020624ec2",
+      "renderSha256": "b3c8023c922bf30514601fcaf857c96c7a91748979d71372340a6d5ce3004102"
+    },
+    {
+      "id": "dc_cube_pets_animal_beaver",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-beaver.glb",
+      "modelSha256": "20f91809e69c66625190eb02aebef9ab543f5cf5cb17b8211b1002330584bfac",
+      "renderSha256": "86921259570dcc850128926a750011cc6df208b860d87878bce4d1be8b687008"
+    },
+    {
+      "id": "dc_cube_pets_animal_pig",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-pig.glb",
+      "modelSha256": "0e09d3c745a7daa1f53ecd320739b94d57a6ea1dfc498da01dd468f3f4c866a1",
+      "renderSha256": "b4382a30c7c1b360c3661df0dd193688950b9e3ecdbbb76c164426215b761545"
+    },
+    {
+      "id": "dc_cube_pets_animal_cow",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-cow.glb",
+      "modelSha256": "57213ad1b06c1b6959c334215b4473039a7cd47c8500b65977df923e2e3e7929",
+      "renderSha256": "e7715637ab1a955f5f7ef1c6467af9438ed4092f6d33906859e99bd8a07c2324"
+    },
+    {
+      "id": "dc_cube_pets_animal_chick",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-chick.glb",
+      "modelSha256": "86dd5f030c9341486313b35b9e827500c430274a83b5d683cab5b1f55bc1024d",
+      "renderSha256": "f411406cbce6baa813bd590c287e5759f6ffcc34f0e1aeaf3e9233d302cf3a3d"
+    },
+    {
+      "id": "dc_cube_pets_animal_parrot",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-parrot.glb",
+      "modelSha256": "a028fcccd8559652ea100fabaceb82ef53633e3474025eca593a753b008f52ab",
+      "renderSha256": "a553a1fec3fee2b5457a97f7c616cb7dbfca9458e5fb627791bc5ee723cd94d1"
+    },
+    {
+      "id": "dc_cube_pets_animal_monkey",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-monkey.glb",
+      "modelSha256": "4f1ba41bd6380f0daa6205442f8fb797c167d7abceaaa58943eae0e6fc9044a6",
+      "renderSha256": "90a75d5ead91a59167415d09d210d907e546f745ddfe3f7107c78caed326ef0f"
+    },
+    {
+      "id": "dc_cube_pets_animal_crab",
+      "pack": "cube-pets",
+      "modelPath": "Models/GLB format/animal-crab.glb",
+      "modelSha256": "80fa5fd7c3652938d9e3c3024bb97dc9391a0e174fcc8b9459b63c613ed050f6",
+      "renderSha256": "151d0390deb12af82a526c0f6f5e5e32bb734f72d525faa70bbdae5c40dc6fd8"
+    }
+  ]
+}

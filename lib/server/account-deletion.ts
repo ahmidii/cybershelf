@@ -123,6 +123,31 @@ export async function deleteAccount(request: Request, bindings: AccountDeletionB
       // Only an opaque account ID survives for the backup reconciliation
       // window. A restore must apply this ledger before it can serve traffic.
       db.prepare(`INSERT INTO account_erasure_ledger (owner_id, requested_at, expires_at) SELECT ?, ?, ? WHERE ${claimed} ON CONFLICT(owner_id) DO NOTHING`).bind(ownerId, now, now + 35 * 24 * 60 * 60_000, jobId, ownerId),
+      // Explicitly contributed, approved copies retain their independent
+      // lifecycle. Pending copies follow the private account's erasure path.
+      db.prepare(`INSERT INTO community_asset_erasures (asset_id,storage_id,requested_at,expires_at)
+        SELECT id,storage_id,?,? FROM community_assets WHERE contributor_id=? AND status<>'approved' AND ${claimed}
+        ON CONFLICT(asset_id) DO UPDATE SET requested_at=excluded.requested_at,expires_at=excluded.expires_at`).bind(now, now + 35 * 86400000, ownerId, jobId, ownerId),
+      db.prepare(`INSERT INTO asset_transfers (id,owner_id,object_key,size,state,writer_done,created_at,updated_at,expires_at,next_attempt_at,attempts,lease_until)
+        SELECT storage_id,contributor_id,object_key,size,'cleanup',1,?,?,?,?,0,0 FROM community_assets WHERE contributor_id=? AND status<>'approved' AND ${claimed}
+        ON CONFLICT(id) DO UPDATE SET state='cleanup',writer_done=1,updated_at=excluded.updated_at,next_attempt_at=excluded.next_attempt_at`).bind(now, now, now, now, ownerId, jobId, ownerId),
+      // Deleting a suspended contributor must not make hidden artwork reappear.
+      db.prepare(`INSERT INTO moderation_hidden (target_kind,target_id,owner_id,moderator_id,created_at)
+        SELECT 'asset',id,NULL,NULL,? FROM community_assets WHERE contributor_id=? AND status='approved'
+          AND EXISTS (SELECT 1 FROM account_suspensions WHERE user_id=?) AND ${claimed}
+        ON CONFLICT(target_kind,target_id) DO NOTHING`).bind(new Date(now).toISOString(), ownerId, ownerId, jobId, ownerId),
+      db.prepare(`UPDATE moderation_hidden SET owner_id=NULL WHERE target_kind='asset' AND owner_id=? AND ${claimed}`).bind(ownerId, jobId, ownerId),
+      db.prepare(`DELETE FROM community_assets WHERE contributor_id=? AND status<>'approved' AND ${claimed}`).bind(ownerId, jobId, ownerId),
+      db.prepare(`UPDATE community_assets SET contributor_id=NULL WHERE contributor_id=? AND status='approved' AND ${claimed}`).bind(ownerId, jobId, ownerId),
+      // The current note is denormalized for the queue. Redact it only when
+      // its latest review belongs to the erased reviewer; a later review by
+      // another person must remain intact. SQLite rowid breaks timestamp ties
+      // in the same order as the transactional audit inserts.
+      db.prepare(`UPDATE community_assets SET review_note='Reviewer account deleted.' WHERE EXISTS (
+        SELECT 1 FROM community_asset_reviews r WHERE r.asset_id=community_assets.id AND r.moderator_id=?
+          AND r.rowid=(SELECT MAX(latest.rowid) FROM community_asset_reviews latest WHERE latest.asset_id=community_assets.id)
+          AND r.note=community_assets.review_note) AND ${claimed}`).bind(ownerId, jobId, ownerId),
+      db.prepare(`UPDATE community_asset_reviews SET moderator_id=NULL,note='Reviewer account deleted.' WHERE moderator_id=? AND ${claimed}`).bind(ownerId, jobId, ownerId),
       db.prepare(`INSERT INTO asset_transfers (id, owner_id, object_key, size, state, writer_done, created_at, updated_at, expires_at, next_attempt_at, attempts, lease_until)
         SELECT id, owner_id, object_key, size, 'cleanup', 1, ?, ?, ?, ?, 0, 0 FROM assets WHERE owner_id = ? AND ${claimed}
         ON CONFLICT(id) DO UPDATE SET state = 'cleanup', updated_at = excluded.updated_at, next_attempt_at = excluded.next_attempt_at`).bind(now, now, now, now, ownerId, jobId, ownerId),

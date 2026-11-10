@@ -149,3 +149,5 @@
   .touchNudges{gap:4px}.touchNudges>span{font-size:10px}.touchNudges small{font-size:9px}
 }
 @media(prefers-reduced-motion:reduce){.item,.palette,.modeOptions>button{animation:none;transition:none}.inMotion .item{transition:none}}
+
+.decorFrame{display:block;width:100%;height:100%;transform-origin:center bottom}.unavailableDecor{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;width:100%;height:100%;color:#8b937a;opacity:.7;padding:5px;border:1px dashed #a2ab9099;border-radius:6px}.unavailableDecor svg{max-width:70%;height:65%}.unavailableDecor small{font-size:clamp(5px,.8cqw,9px);line-height:1.3}

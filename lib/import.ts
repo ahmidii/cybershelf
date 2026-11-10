@@ -151,6 +151,13 @@ export function parseGoodreadsCSV(text: string): { books: Book[]; warnings: stri
       const image = get(column);
       if (image) { try { book[property] = url(image, `${title} ${column}`, true); } catch { warnings.push(`“${title}”: an invalid ${column} was skipped.`); } }
     }
+    for (const [column, property, image] of [['shared spine id', 'spineAssetId', 'spineUrl'], ['shared cover id', 'coverAssetId', 'coverUrl']] as const) {
+      const value = get(column);
+      if (value && /^[a-z\d_-]{1,100}$/i.test(value) && book[image] === `/api/community-assets/${value}/image`) book[property] = value;
+      else if (value) warnings.push(`“${title}”: an invalid shared artwork reference was skipped.`);
+    }
+    const spineMode = get('spine mode');
+    if (['auto', 'custom', 'typographic'].includes(spineMode)) book.spineMode = spineMode as Book['spineMode'];
     const readingLog = get('reading log');
     if (readingLog) { try { book.readingLog = parseReadingLog(JSON.parse(readingLog), `${title} reading log`); } catch { warnings.push(`“${title}”: an invalid reading log was skipped. The book and its other reading details were kept.`); } }
     const progress = Number(get('progress').replace('%', ''));
@@ -279,6 +286,7 @@ function url(value: unknown, context: string, allowAsset = false): string {
   if (!text) return '';
   if (allowAsset && /^\/api\/assets\/[a-z\d_-]{1,100}$/i.test(text)) return text;
   if (allowAsset && /^\/api\/(?:publications|profiles|journal)\/[a-z\d_-]{1,100}\/assets\/[a-z\d_-]{1,100}$/i.test(text)) return text;
+  if (allowAsset && /^\/api\/community-assets\/[a-z\d_-]{1,100}\/image$/i.test(text)) return text;
   try { const parsed = new URL(text); if (['https:', 'http:'].includes(parsed.protocol) && !parsed.username && !parsed.password) return parsed.href; } catch { /* handled below */ }
   throw new Error(`Invalid backup: ${context} must use an http or https URL.`);
 }
@@ -378,6 +386,14 @@ export function parseCatalogJSON(text: string): AppState {
     if (data.description !== undefined) book.description = string(data.description, `${context} description`, 10000);
     if (data.readingLog !== undefined) book.readingLog = parseReadingLog(data.readingLog, `${context} reading log`);
     if (data.spineUrl !== undefined) book.spineUrl = url(data.spineUrl, `${context} spine URL`, true);
+    if (data.spineMode !== undefined) book.spineMode = enumValue(data.spineMode, ['auto', 'custom', 'typographic'] as const, `${context} spine preference`);
+    for (const [key, image] of [['spineAssetId', 'spineUrl'], ['coverAssetId', 'coverUrl']] as const) {
+      if (data[key] !== undefined) {
+        const sharedId = id(data[key], `${context} shared artwork`);
+        if (book[image] !== `/api/community-assets/${sharedId}/image`) throw new Error(`Invalid backup: ${context} shared artwork must use its catalogue image.`);
+        book[key] = sharedId;
+      }
+    }
     if (data.format !== undefined) book.format = enumValue(data.format, ['paperback', 'hardcover', 'pocket', 'large'] as const, `${context} book format`);
     if (data.dimensions !== undefined) {
       const dimensions = object(data.dimensions, `${context} dimensions`);
@@ -455,6 +471,16 @@ export function parseCatalogJSON(text: string): AppState {
         if (item.assetId !== undefined) result.assetId = id(item.assetId, 'decoration file ID');
         if (item.imageUrl !== undefined) result.imageUrl = url(item.imageUrl, 'decoration image URL', true);
         if (item.label !== undefined) result.label = string(item.label, 'decoration label', 150);
+        if (item.sharedAssetId !== undefined) {
+          result.sharedAssetId = id(item.sharedAssetId, 'shared decoration ID');
+          if (result.decor !== 'image' || result.assetId || result.imageUrl !== `/api/community-assets/${result.sharedAssetId}/image`) throw new Error('Invalid backup: a shared decoration must use its catalogue image.');
+        }
+        if (item.decorWidthMm !== undefined) result.decorWidthMm = number(item.decorWidthMm, 'decoration width', 5, 350);
+        if (item.decorHeightMm !== undefined) result.decorHeightMm = number(item.decorHeightMm, 'decoration height', 10, 280);
+        if (item.decorFlip !== undefined) {
+          if (typeof item.decorFlip !== 'boolean') throw new Error('Invalid backup: decoration flip must be true or false.');
+          result.decorFlip = item.decorFlip;
+        }
       }
       return result;
     });

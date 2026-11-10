@@ -254,8 +254,8 @@ export default function AccountSettings({ user, emailAvailable, verificationErro
         </section>
         <section className={styles.card} aria-labelledby="account-safety-heading">
           <div className={styles.sectionHeading}><ShieldCheck size={20} aria-hidden="true"/><h2 id="account-safety-heading">Your reading circle</h2></div>
-          <p className={styles.description}>Manage blocked readers and find the community safety tools.</p>
-          <a className={styles.textLink} href="/safety">Safety &amp; blocked readers<ArrowRight size={15} aria-hidden="true"/></a>
+          <p className={styles.description}>Manage blocked readers, review your shared contributions, and find the community safety tools.</p>
+          <a className={styles.textLink} href="/safety">Safety &amp; blocked readers<ArrowRight size={15} aria-hidden="true"/></a><p><a className={styles.textLink} href="/community-contributions#my-contributions">My catalogue contributions<ArrowRight size={15} aria-hidden="true"/></a></p>
         </section>
         <FileStorage accountId={user.userId} disabled={!!busy || accountChanged}/>
         <AccountDeletionPanel accountId={user.userId} identity={accountUsername || user.email || user.displayName} disabled={!!busy || accountChanged}

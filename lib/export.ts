@@ -18,7 +18,7 @@ export function catalogCSV(books: Book[]): string {
     'Title', 'Author', 'ISBN13', 'My Rating', 'Exclusive Shelf', 'My Review',
     'Private Notes', 'Date Added', 'Date Read', 'Number of Pages', 'Progress', 'Sources',
     'Book Format', 'Height (mm)', 'Cover Width (mm)', 'Spine Thickness (mm)', 'Size Source', 'Spine Color', 'Cover Image URL', 'Spine Image URL',
-    'Reading Log', 'Catalog ID', 'Edition ID', 'Current Page',
+    'Reading Log', 'Catalog ID', 'Edition ID', 'Current Page', 'Shared Spine ID', 'Shared Cover ID', 'Spine Mode',
   ]];
   const statuses = { unread: 'to-read', reading: 'currently-reading', read: 'read', paused: 'paused', dnf: 'did-not-finish' };
   for (const book of books) rows.push([
@@ -26,7 +26,7 @@ export function catalogCSV(books: Book[]): string {
     book.notes, book.addedAt.slice(0, 10), book.finishedAt?.slice(0, 10), book.pages,
     book.progress, book.sources.map(source => `${source.label}${source.url ? `: ${source.url}` : source.location ? `: ${source.location}` : ''}`).join(' | '),
     book.format, book.dimensions?.heightMm, book.dimensions?.widthMm, book.dimensions?.thicknessMm, book.dimensions?.source, book.color, book.coverUrl, book.spineUrl,
-    book.readingLog ? JSON.stringify(book.readingLog) : undefined, book.catalogId, book.editionId, book.currentPage,
+    book.readingLog ? JSON.stringify(book.readingLog) : undefined, book.catalogId, book.editionId, book.currentPage, book.spineAssetId, book.coverAssetId, book.spineMode,
   ]);
   return '\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n') + '\r\n';
 }

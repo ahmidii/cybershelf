@@ -7,7 +7,8 @@ let active = false;
 type Waiter = { resume: () => void; reject: (error: Error) => void };
 const waiting: Waiter[] = [];
 
-/** Only one multipart parse / full-file buffer is held per Worker isolate.
+/** Only one multipart parse / full-file buffer (including shared image copies)
+ * is held per Worker isolate.
  * Waiting requests have bounded count/time and do not read their bodies yet. */
 export async function withUploadBodySlot<T>(request: Request, action: () => Promise<T>): Promise<T> {
   if (request.signal.aborted) throw new AssetTransferError(400, 'The upload was cancelled.', 'UPLOAD_CANCELLED');

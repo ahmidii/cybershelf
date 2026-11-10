@@ -214,3 +214,31 @@ export const bookReads=sqliteTable('book_reads',{
   ownerId:text('owner_id').notNull().references(()=>user.id,{onDelete:'cascade'}),id:text('id').notNull(),catalogId:text('catalog_id').notNull(),
   finishedAt:text('finished_at').notNull(),createdAt:text('created_at').notNull(),
 },table=>[primaryKey({columns:[table.ownerId,table.id]}),uniqueIndex('book_reads_owner_catalog_date_idx').on(table.ownerId,table.catalogId,table.finishedAt),index('book_reads_catalog_owner_idx').on(table.catalogId,table.ownerId)]);
+
+// Approved, explicitly contributed copies can outlive their contributor.
+export const communityAssets = sqliteTable('community_assets', {
+  id: text('id').primaryKey(), contributorId: text('contributor_id').references(() => user.id, { onDelete: 'set null' }),
+  kind: text('kind', { enum: ['decor', 'spine', 'cover'] }).notNull(),
+  status: text('status', { enum: ['pending', 'approved', 'rejected', 'withdrawn'] }).notNull(),
+  storageId: text('storage_id').notNull().unique(), objectKey: text('object_key').notNull().unique(),
+  mime: text('mime').notNull(), size: integer('size').notNull(), contentHash: text('content_hash').notNull(),
+  editionKey: text('edition_key').notNull().default(''), metadata: text('metadata').notNull(),
+  consentVersion: text('consent_version').notNull(), reviewNote: text('review_note').notNull().default(''),
+  createdAt: text('created_at').notNull(), updatedAt: text('updated_at').notNull(),
+}, table => [index('community_assets_status_kind_idx').on(table.status, table.kind, table.id),
+  index('community_assets_contributor_idx').on(table.contributorId, table.createdAt),
+  index('community_assets_contributor_content_idx').on(table.contributorId, table.contentHash, table.kind, table.editionKey)]);
+export const communityAssetEditions = sqliteTable('community_asset_editions', {
+  assetId: text('asset_id').notNull().references(() => communityAssets.id, { onDelete: 'cascade' }),
+  editionKey: text('edition_key').notNull(),
+}, table => [primaryKey({ columns: [table.assetId, table.editionKey] }), index('community_asset_editions_key_idx').on(table.editionKey)]);
+export const communityAssetReviews = sqliteTable('community_asset_reviews', {
+  id: text('id').primaryKey(), assetId: text('asset_id').notNull().references(() => communityAssets.id, { onDelete: 'cascade' }),
+  moderatorId: text('moderator_id').references(() => user.id, { onDelete: 'set null' }),
+  action: text('action').notNull(), note: text('note').notNull(), createdAt: text('created_at').notNull(),
+}, table => [index('community_asset_reviews_asset_idx').on(table.assetId, table.createdAt)]);
+// Apply current erasures before any restoration of old catalogue records.
+export const communityAssetErasures = sqliteTable('community_asset_erasures', {
+  assetId: text('asset_id').primaryKey(), storageId: text('storage_id').notNull(),
+  requestedAt: integer('requested_at').notNull(), expiresAt: integer('expires_at').notNull(),
+}, table => [index('community_asset_erasures_expiry_idx').on(table.expiresAt)]);

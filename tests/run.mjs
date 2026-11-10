@@ -15,6 +15,7 @@ const files = [
   'lib/account-identity.ts', 'lib/server/recovery-keys.ts', 'tests/account-identity.test.ts', 'tests/recovery-keys.test.ts',
   'lib/server/asset-transfers.ts', 'lib/server/upload-body.ts', 'tests/upload-body.test.ts',
   'lib/types.ts', 'lib/demo.ts', 'lib/arrange.ts', 'lib/import.ts', 'lib/export.ts', 'lib/book-catalog.ts', 'lib/book-community.ts',
+  'lib/shared-assets.ts', 'lib/community-artwork.ts', 'lib/server/shared-image.ts', 'tests/shared-assets.test.ts', 'tests/shared-image.test.ts', 'tests/community-artwork.test.ts',
   'lib/book-size.ts', 'lib/shelf-geometry.ts', 'lib/shelf-placement.ts', 'lib/shelf-actions.ts', 'lib/reading.ts', 'lib/reading-progress.ts', 'lib/reading-view.ts', 'lib/reading-log.ts', 'lib/spine-image.ts', 'lib/connections.ts', 'lib/connections/hardcover.ts',
   'tests/import.test.ts', 'tests/arrange.test.ts', 'tests/book-size.test.ts', 'tests/shelf-geometry.test.ts', 'tests/shelf-actions.test.ts', 'tests/reading.test.ts', 'tests/reading-progress.test.ts', 'tests/reading-view.test.ts', 'tests/reading-log.test.ts', 'tests/spine-image.test.ts', 'tests/connections.test.ts', 'tests/hardcover.test.ts', 'tests/book-community.test.ts',
 ];
@@ -55,6 +56,9 @@ try {
     resolve(scratch, 'tests/connections.test.mjs'),
     resolve(scratch, 'tests/hardcover.test.mjs'),
     resolve(scratch, 'tests/book-community.test.mjs'),
+    resolve(scratch, 'tests/shared-assets.test.mjs'),
+    resolve(scratch, 'tests/shared-image.test.mjs'),
+    resolve(scratch, 'tests/community-artwork.test.mjs'),
     resolve(root, 'tests/book-catalog.test.mjs'),
     resolve(root, 'tests/spoilers.test.mjs'),
     resolve(root, 'lib/server/server.test.mjs'),
@@ -64,6 +68,7 @@ try {
     resolve(root, 'tests/account-ui.test.mjs'),
     resolve(root, 'tests/operations.test.mjs'),
     resolve(root, 'tests/backup-provisioning.test.mjs'),
+    resolve(root, 'tests/dialogs.test.mjs'),
   ], { cwd: root, stdio: 'inherit' });
   if (result.error) throw result.error;
   if (result.signal) throw new Error(`The regression process was interrupted by ${result.signal}; no complete verification result was accepted.`);

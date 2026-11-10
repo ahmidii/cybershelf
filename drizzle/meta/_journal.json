@@ -64,6 +64,13 @@
       "when": 1794229888549,
       "tag": "0008_public_beta_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1794296215970,
+      "tag": "0009_shared_assets",
+      "breakpoints": true
     }
   ]
 }

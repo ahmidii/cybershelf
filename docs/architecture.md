@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the 0.8 source candidate. The app runs on Vinext/React with a Cloudflare Worker, a D1 database, and an R2 bucket. Better Auth supplies username/password authentication, legacy email login, and database-backed sessions on the standalone Cloudflare deployment. See [release status](release-status.md) before deploying the candidate.
+This document describes the 0.9 source. The app runs on Vinext/React with a Cloudflare Worker, a D1 database, and an R2 bucket. Better Auth supplies username/password authentication, legacy email login, and database-backed sessions on the standalone Cloudflare deployment. See [release status](release-status.md) for verification and operating requirements.
 
 ## Product model
 
@@ -11,6 +11,7 @@ This document describes the 0.8 source candidate. The app runs on Vinext/React w
 | Catalog work | A public work identity shared by its editions; it is independent of a private library book ID. |
 | Catalog edition | A selected publishing edition with its own identifier and available ISBN/page count. |
 | Community contribution | An explicitly shared rating or dated completed read, separate from private reading records. |
+| Shared asset | An approved reusable decoration, spine, or cover with its own identity, source, credit, permission, and revocable image route. |
 | Source | An uploaded original, reading-platform link, other link, or physical location. |
 | Shelf | A named arrangement referencing library book IDs and decorative objects. |
 | Placement | One book or decoration with a row, normalized horizontal center, and optional supporting item; the legacy `slot: null` marker identifies the staging tray. |
@@ -79,6 +80,10 @@ Application data is split between private state and deliberate public snapshots:
 | `community_books` | Explicit community work records containing only a public title and author. |
 | `book_ratings` | One explicit half-star community rating per owner/work, with deletion cascades. |
 | `book_reads` | Explicit completed-read dates, unique per owner/work/day and bounded per owner/work. |
+| `community_assets` | Explicit image contributions, independently stored bytes, searchable metadata, permission, and review status. |
+| `community_asset_editions` | Verified edition/ISBN aliases for shared book artwork. |
+| `community_asset_reviews` | Contribution review decisions and moderator notes. |
+| `community_asset_erasures` | Minimal 35-day withdrawal/rejection evidence for safe restoration. |
 
 Better Auth additionally owns `auth_user`, `auth_session`, `auth_account`, `auth_verification`, and `auth_rate_limit`. Password hashes and session tokens stay server-side. Verification records support email confirmation and one-hour email-reset tokens. `account_recovery_keys` stores only digests of random recovery keys; `account_action_limits` holds bounded attempt counters keyed by HMAC digests rather than plaintext usernames/IP addresses. Usernames are nullable and unique, preserving existing email accounts during migration.
 

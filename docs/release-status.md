@@ -1,58 +1,57 @@
-# Release status — 0.8.0 public-beta candidate
+# Release status — 0.9.0 shared artwork
 
-Updated 2026-11-09. Package version: `0.8.0`.
+Updated 2026-11-10. Package version: `0.9.0`.
 
-## Current status
+## Scope and current evidence
 
-**This release has passed local acceptance; broader public-beta promotion still requires production evidence.** It includes username accounts and recovery keys together with account deletion, reporting, blocking, moderation, atomic upload reservations, and production recovery/maintenance tooling. The build, regression, built-Worker and migration checks below passed. Confirm the serving deployment and complete the operational gates before describing the service as ready for wider public use.
+This release adds a searchable set of 100 Kenney/KayKit decorations and a shared contribution system for decorations, book spines, and covers. Community metadata and independent image copies persist in D1/R2, with explicit permission, review, edition matching, credits, withdrawal, and recovery reconciliation. It retains the account, reading, shelf, and safety features from 0.8.0.
 
-The initial 0.8.0 release was deployed from commit `7f35e164501c568d09a02ae1f1d4a7fb916b3999`: Cloudflare Workers Builds reported success and the live health endpoint returned release 0.8.0 with accounts and email configured. The home, username-only signup and privacy pages were observed working. A complete original-file backup scan was observed in production on 2026-11-09. The monitoring follow-up makes first-run cleanup failures visible and exposes whether maintenance has started; its own build check confirms publication. These deployment signals do not establish email inbox delivery or administrator security.
+Local release acceptance passed on 2026-11-10: TypeScript, the production build, all 239 regression cases, the complete built-Worker integration suite, and the nine-case operations rehearsal. Image-orientation hardening is included in those final checks. Confirm the serving deployment from the release commit's Cloudflare check and the live health response; local acceptance alone does not establish publication.
 
-## Authentication update
+The additive migration is `0009_shared_assets`. The integration suite applies all ten migrations to disposable storage. The existing GitHub-to-Cloudflare workflow applies pending migrations before publishing. This update does not migrate hosting, replace authentication secrets, alter account email setup, or add runtime dependencies. Better Auth and its adapter remain pinned to 1.7.16 under the already approved exact-version dependency-age exceptions.
 
-Better Auth and `@better-auth/drizzle-adapter` are now pinned to **1.7.16** in the source and lockfile. The maintainer explicitly approved exact-version exceptions for the required authentication package family, resolving the earlier release-age block. The general seven-day dependency policy remains enabled; it was not globally disabled.
+## What is ready in the source
 
-The acceptance results below are from the complete expanded 0.8.0 source with Better Auth 1.7.16, including the final cleanup-progress and monitoring corrections. They supersede the earlier username-only candidate checks.
+- A transparent, searchable starter catalogue with 100 CC0 decorations, categories, public source/license details, resizing, flipping, and direct shelf placement.
+- Shared decorations, covers, and spines with private pending uploads, explicit permission, independent copies, contributor management, moderator review, reports, and withdrawal.
+- Verified edition/ISBN matching, equivalent ISBN-10/13 handling, alternate-printing choices, automatic matching spines, and protection of existing personal artwork.
+- Saved shared identities across private libraries, published shelves/profiles, copied arrangements, and supported exports. Images are served through revocable routes with public metadata allowlists.
+- Existing atomic quotas extended to contributed copies; bounded image processing and submission limits; account deletion that erases private/pending copies and detaches explicitly retained approved contributions.
+- Backup scan coverage for approved retained copies and a restore procedure that imports current asset consent/visibility and both erasure ledgers before recovering files or reopening service.
+- Original creator license files, exact source provenance, image/model/archive hashes, and a reproducible offline rendering script.
 
-## Candidate scope
+The curated catalogue works without an external search key. A third-party web search is not part of this release. Pending community submissions become generally available only after a configured moderator approves them. Uploading an image or publishing a shelf does not automatically contribute that image.
 
-- Username/password signup without required email, one-time recovery-key display and rotation, existing email-account compatibility, and stronger new-password controls.
-- Fresh-session/current-password account deletion with explicit confirmation. Authentication, live private/public records, and linked reports/audit data are removed atomically; durable R2 cleanup survives storage failures. A minimal 35-day erasure ledger supports recovery reconciliation.
-- Canonical public reports, bounded explanations, duplicate/rate controls, reciprocal blocks, and authenticated-view filtering across profiles, shelves, reading updates, replies, feeds, reading rooms, and image routes.
-- An immutable-account-ID moderator allowlist, review queue, fresh-session actions, decision history, content hide/restore, and participation suspension/restore. Suspension preserves private export, account security, and deletion access.
-- Atomic upload byte/count reservations, in-flight limits, bounded multipart processing, account-state checks at finalization, and retryable cleanup. Empty cancellation barriers protect against unresolved late writes.
-- Optional private original/artwork backup copies, bounded maintenance, safe operational status/audit tooling, and an isolated restore procedure that preserves current credentials and applies current erasure evidence before reopening service.
+## Verification record
 
-The additive migrations are `0007_username_accounts` and `0008_public_beta_safety`. The existing Worker, account secret, database, primary file bucket, domain, and email configuration are intended to be preserved. The optional backup destination requires its own private binding and retention setup; source configuration is not proof of provisioning.
-
-## Verification record for this expanded candidate
-
-| Check | Current record |
+| Check | Record |
 | --- | --- |
-| TypeScript and production build | Passed on 2026-11-09 for the expanded release. |
-| Regression and account UI tests | 201 passed, zero failed, zero skipped, on 2026-11-09. |
-| Built-Worker integration and all migrations | Passed on 2026-11-09, including healthy multi-batch deletion progress and failed standalone removal monitoring. Disposable D1/R2 and intercepted-mail fixtures cover all nine migrations, account recovery, deletion, moderation/blocks, upload races/failures, actual scheduled handlers and original-file copying/recovery. |
-| Isolated restore rehearsal | Passed using disposable SQLite plus synthetic originals: current credentials and erasures survive rollback; old sessions/reset tokens and public snapshots are removed. Separate D1/R2 recovery fixtures verify original bytes. Live Cloudflare restore remains unverified. |
-| Browser and physical-device behavior | Live home, username-only signup and privacy pages checked after the initial release. Managed local preview is unavailable because its daemon mailbox is missing. No physical iPhone/iPad verification is claimed. |
-| Production deployment | Initial 0.8.0 deployment confirmed from the successful Cloudflare check and live release response. Verify subsequent monitoring commits from their own Cloudflare checks and health response. |
-| Cloudflare administration and storage audit | Incomplete. The attempted dashboard sign-in returned HTTP 403; inaccessible settings remain unverified. |
-| Real moderator setup and review coverage | Pending a verified Cybershelf account ID and assigned reviewer. There is no automatic first-user promotion. |
-| Production backup/restore and alert delivery | First complete production original-file scan observed; live isolated restore and notification delivery remain unverified. Local synthetic restoration passed. |
+| TypeScript and production build | Passed on 2026-11-10 with final image-orientation hardening. |
+| Regression and account UI tests | 239 passed, zero failed and zero skipped, on 2026-11-10. |
+| Built-Worker integration | Passed with all ten migrations, isolated D1/R2 and intercepted external fixtures. Includes actual cross-account contribution/reuse, curated image routes, verified editions, privacy, moderation, withdrawal, reviewer/account deletion, and backup copy behavior. Repeated successfully against the final production bundle and sanitizer. |
+| Isolated restore rehearsal | Nine operations cases passed, including withdrawn/rejected artwork, retained approved copies after contributor deletion, current hiding/suspension, missing evidence, checksum rollback, and idempotent reconciliation. No live restore was performed. |
+| Visual catalogue review | All 100 rendered objects inspected in contact sheets; transparency and output dimensions checked. Twenty-four real JPEG/PNG/WebP orientation samples independently decoded with identical display results. |
+| Browser and physical-device behavior | Managed local preview is unavailable because its preview relay is missing. Live 0.9.0 interface verification remains pending. No physical iPhone/iPad verification is claimed. |
+| Production publication | Confirm the release commit's Cloudflare check and live release response. |
+| Moderator runtime configuration | The live 0.8.0 health endpoint reported moderation configured on 2026-11-10 before this update. Actual reviewer access and staffing are separate operational checks; no account is automatically promoted. |
+| Administrator security, recovery and alerts | Existing operational gates remain unverified where no production evidence was obtained. |
 
-No independent penetration test or blanket security certification is claimed. The repository's automated tests use synthetic fixtures and disposable storage; they are not authorization to inspect real libraries, send account email, or exercise production moderation/deletion.
+Tests use synthetic accounts and disposable storage. No production library, user upload, account deletion, report, or real recipient is part of these fixtures. No independent penetration test or blanket security certification is claimed.
 
-## Gates before wider public promotion
+## Operator steps
 
-Configure actual moderator IDs in the Worker's runtime `MODERATOR_USER_IDS`, verify queue access and ordinary-account denial, assign report review responsibility, and publish a private support contact. The queue accepts reports independently of whether an operator has completed this setup, so a working report form does not establish moderation coverage.
+Configure `MODERATOR_USER_IDS` in the existing Worker's runtime variables with the immutable Cybershelf account IDs of actual reviewers. Readers can copy their account ID from **Account & security → Safety & blocked readers → Account identifier**. Confirm the configured reviewer can open `/moderation` and an ordinary account cannot. Assign review coverage and publish a private support contact. Approval requires a recent sign-in and a note; self-approval is refused.
 
-Verify administrator MFA and access/token scope, both buckets' managed URLs and custom domains, the intended D1 recovery point and actual plan retention, deployed maintenance, complete backup freshness, and delivery of operational alerts. Perform the restore procedure in isolated resources with synthetic originals before claiming that database-and-file recovery is tested. Unknown settings remain unknown until evidence is obtained.
+The live 0.8.0 health response was checked immediately before this update on 2026-11-10. It reported accounts, email, moderation configuration, maintenance configuration/start/freshness, cleanup health, backup configuration, and backup freshness as true. A complete original-file backup scan had also been observed on 2026-11-09. Those observations do not verify administrator MFA, scoped tokens, every storage access path, actual reviewer access/staffing, restore performance, or alert delivery. The earlier dashboard sign-in attempt returned HTTP 403; inaccessible settings remain unverified.
 
-The recovery-copy policy is at most 30 days, with storage-expiry processing lag. The minimal erasure ledger lasts 35 days and must cover all surviving backup history. Restores must apply the latest trusted account-security state and current erasure evidence, revoke restored sessions/reset tokens, and honor moderation/publication restrictions before serving content. Do not promote an old backup whose own ledger predates recent deletions.
+Before broader promotion, verify administrator MFA/access, primary and backup bucket privacy, actual D1 retention, deployed maintenance, complete backup freshness, and operational alert delivery. Perform the restore procedure in isolated resources before claiming production database-and-file recovery is tested.
+
+Recovery copies and SQL/incident exports have an operator policy of at most 30 days, with storage expiry processing lag. Account and shared-asset erasure ledgers last 35 days and must cover all surviving backup history. Restore current account-security state, current shared catalogue/consent/status, both erasure ledgers, and current moderation restrictions before serving anything. Revoke old sessions/reset tokens. A historical file or an old approval is not sufficient evidence to republish withdrawn artwork.
 
 ## Retained boundaries
 
-Username accounts provide pseudonymity; they do not make the service completely anonymous or end-to-end encrypted. Private library metadata and files remain readable by the service operator. Public content remains accessible when signed out even if a signed-in reader is blocked. Reports are private to configured moderators but are not end-to-end encrypted.
+Username accounts are pseudonymous; service operators can read stored private metadata and files. Public material remains accessible when signed out even when a signed-in reader is blocked. Contributions deliberately choose a public creator credit. Approved contributions may remain after account deletion under their explicit permission, with the account relationship removed; withdraw them first if their shared copies should be erased as well. Private and unapproved uploads are erased with the account.
 
-Shared ratings/reads come from explicit contributions and public completion posts. Private library changes are not broadcast. Goodreads uses CSV import; Hardcover requires provider authorization and keeps credentials in browser memory. Amazon synchronization, DRM removal, automatic retailer activity, OPDS, and an in-browser EPUB reader remain outside this release. There are no automatic moderation-decision emails or social push notifications.
+Shared artwork coverage depends on actual contributions and verified edition metadata. The starter decorations are display miniatures, not real product measurements. Goodreads remains CSV import, Hardcover requires provider authorization, and Amazon synchronization, DRM removal, retailer activity, OPDS, and an in-browser EPUB reader remain outside scope. No automatic moderation-decision email or social push notification is added.
 
-For setup and limitations, see [beta readiness](beta-readiness.md), [production operations](production-operations.md), [original file backups](original-backups.md), [moderation](moderation.md), [upload storage](upload-storage.md), [self-hosting](self-hosting.md), and the [changelog](../CHANGELOG.md).
+See [shared artwork](shared-assets.md), [asset sources](decor-asset-sources.md), [production operations](production-operations.md), [original backups](original-backups.md), [moderation](moderation.md), [upload storage](upload-storage.md), and the [changelog](../CHANGELOG.md).

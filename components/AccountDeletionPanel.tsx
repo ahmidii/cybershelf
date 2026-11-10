@@ -72,6 +72,7 @@ export default function AccountDeletionPanel({ accountId, identity, disabled, on
       <div className={styles.keyWarning}>
         <p><strong>This cannot be undone.</strong> Save any library or file exports you want to keep from Settings in your reading space first.</p>
         <p>Your sign-in and public pages are removed when deletion is accepted. File erasure may finish in the background if storage is busy. Copies downloaded by others and independent browser drafts are outside this account.</p>
+        <p>Approved artwork you explicitly contributed to the community can remain with its chosen public credit, as agreed at submission. <a href="/community-contributions#my-contributions">Review or withdraw your contributions</a> before deleting your account if you want those shared copies removed. Personal uploads and pending contributions are removed.</p>
         <p>Historical backups expire under the service’s backup retention policy and must not be used to restore a deleted account. Read <a href="/privacy">Privacy and your data</a> for current retention details.</p>
       </div>
       {error && <div className={styles.error} ref={errorRef} role="alert" tabIndex={-1}>
